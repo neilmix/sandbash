@@ -4,9 +4,12 @@
 #include <stdbool.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <errno.h>
 #include "config.h"
 #include "sandbox.h"
 #include "utils.h"
+
+extern char** environ;
 
 typedef enum {
     MODE_SANDBOX,
@@ -279,9 +282,43 @@ int main(int argc, char* argv[]) {
         case MODE_LIST_PATHS:
             result = handle_list_paths(config);
             break;
-        case MODE_SANDBOX:
-            printf("TODO: Launch sandbox\n");
+        case MODE_SANDBOX: {
+            // Generate sandbox profile
+            char* profile = sandbox_generate_profile(config);
+            if (!profile) {
+                fprintf(stderr, "Error: Failed to generate sandbox profile\n");
+                result = 1;
+                break;
+            }
+
+            // Initialize sandbox
+            if (!sandbox_init_with_profile(profile)) {
+                fprintf(stderr, "Error: Failed to initialize sandbox\n");
+                free(profile);
+                result = 1;
+                break;
+            }
+
+            free(profile);
+
+            // Prepare bash arguments
+            int bash_argc = args->bash_argc + 1;
+            char** bash_argv = malloc((bash_argc + 1) * sizeof(char*));
+            bash_argv[0] = "/bin/bash";
+            for (int i = 0; i < args->bash_argc; i++) {
+                bash_argv[i + 1] = args->bash_argv[i];
+            }
+            bash_argv[bash_argc] = NULL;
+
+            // Launch bash
+            execve("/bin/bash", bash_argv, environ);
+
+            // If we get here, execve failed
+            fprintf(stderr, "Error: Failed to launch bash: %s\n", strerror(errno));
+            free(bash_argv);
+            result = 1;
             break;
+        }
     }
 
     config_free(config);
