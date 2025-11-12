@@ -36,6 +36,13 @@ static bool parse_config_file(const char* filepath, PathList* list) {
             trimmed++;
         }
 
+        // Trim trailing whitespace
+        size_t trim_len = strlen(trimmed);
+        while (trim_len > 0 && (trimmed[trim_len-1] == ' ' || trimmed[trim_len-1] == '\t')) {
+            trimmed[trim_len-1] = '\0';
+            trim_len--;
+        }
+
         if (trimmed[0] == '\0' || trimmed[0] == '#') {
             continue;
         }
