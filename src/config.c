@@ -5,6 +5,55 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <limits.h>
+#include <sys/stat.h>
+
+static bool parse_config_file(const char* filepath, PathList* list) {
+    if (!filepath || !list) {
+        return false;
+    }
+
+    FILE* f = fopen(filepath, "r");
+    if (!f) {
+        // File not existing is okay
+        return true;
+    }
+
+    char line[MAX_PATH_LENGTH];
+    int line_num = 0;
+
+    while (fgets(line, sizeof(line), f)) {
+        line_num++;
+
+        // Remove newline
+        size_t len = strlen(line);
+        if (len > 0 && line[len - 1] == '\n') {
+            line[len - 1] = '\0';
+        }
+
+        // Skip empty lines and comments
+        char* trimmed = line;
+        while (*trimmed == ' ' || *trimmed == '\t') {
+            trimmed++;
+        }
+
+        if (trimmed[0] == '\0' || trimmed[0] == '#') {
+            continue;
+        }
+
+        // Expand and add path
+        char* expanded = expand_path(trimmed);
+        if (expanded) {
+            pathlist_add(list, expanded);
+            free(expanded);
+        } else {
+            fprintf(stderr, "Warning: Invalid path on line %d: %s\n",
+                    line_num, trimmed);
+        }
+    }
+
+    fclose(f);
+    return true;
+}
 
 PathList* pathlist_create(void) {
     PathList* list = malloc(sizeof(PathList));
@@ -171,4 +220,48 @@ PathList* config_get_all_paths(Config* config) {
     }
 
     return all;
+}
+
+bool config_load_global(Config* config) {
+    if (!config) {
+        return false;
+    }
+
+    char* xdg_config = get_xdg_config_dir();
+    if (!xdg_config) {
+        return false;
+    }
+
+    char filepath[PATH_MAX];
+    snprintf(filepath, sizeof(filepath), "%s/sandbash/config", xdg_config);
+    free(xdg_config);
+
+    return parse_config_file(filepath, config->global_paths);
+}
+
+bool config_load_local(Config* config) {
+    if (!config) {
+        return false;
+    }
+
+    // Compute hash of current directory
+    char* hash = compute_path_hash(config->current_dir);
+    if (!hash) {
+        return false;
+    }
+
+    char* xdg_config = get_xdg_config_dir();
+    if (!xdg_config) {
+        free(hash);
+        return false;
+    }
+
+    char filepath[PATH_MAX];
+    snprintf(filepath, sizeof(filepath), "%s/sandbash/projects/%s",
+             xdg_config, hash);
+
+    free(xdg_config);
+    free(hash);
+
+    return parse_config_file(filepath, config->local_paths);
 }
