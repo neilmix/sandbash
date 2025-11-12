@@ -105,6 +105,122 @@ static void free_arguments(Arguments* args) {
     free(args);
 }
 
+static int handle_add_path(Config* config, const char* path) {
+    char* expanded = expand_path(path);
+    if (!expanded) {
+        fprintf(stderr, "Error: Invalid path: %s\n", path);
+        return 1;
+    }
+
+    pathlist_add(config->local_paths, expanded);
+    free(expanded);
+
+    if (!config_save_local(config)) {
+        fprintf(stderr, "Error: Failed to save configuration\n");
+        return 1;
+    }
+
+    char* config_path = config_get_local_path(config);
+    printf("Added path to config: %s\n", config_path);
+    printf("Path: %s\n", path);
+    free(config_path);
+
+    return 0;
+}
+
+static int handle_remove_path(Config* config, const char* path) {
+    char* expanded = expand_path(path);
+    if (!expanded) {
+        fprintf(stderr, "Error: Invalid path: %s\n", path);
+        return 1;
+    }
+
+    if (!pathlist_remove(config->local_paths, expanded)) {
+        fprintf(stderr, "Warning: Path not found in config: %s\n", path);
+    }
+    free(expanded);
+
+    if (!config_save_local(config)) {
+        fprintf(stderr, "Error: Failed to save configuration\n");
+        return 1;
+    }
+
+    char* config_path = config_get_local_path(config);
+    printf("Removed path from config: %s\n", config_path);
+    printf("Path: %s\n", path);
+    free(config_path);
+
+    return 0;
+}
+
+static int handle_edit(Config* config) {
+    char* config_path = config_get_local_path(config);
+    if (!config_path) {
+        fprintf(stderr, "Error: Failed to determine config path\n");
+        return 1;
+    }
+
+    // Ensure file exists
+    FILE* f = fopen(config_path, "a");
+    if (f) {
+        fclose(f);
+    }
+
+    const char* editor = getenv("EDITOR");
+    if (!editor) {
+        editor = "vi";
+    }
+
+    char command[PATH_MAX + 100];
+    snprintf(command, sizeof(command), "%s %s", editor, config_path);
+
+    int result = system(command);
+    free(config_path);
+
+    return result;
+}
+
+static int handle_list_paths(Config* config) {
+    printf("Current directory: %s (always writable)\n\n", config->current_dir);
+
+    char* xdg_config = get_xdg_config_dir();
+
+    printf("Global paths (from %s/sandbash/config):\n", xdg_config);
+    if (config->global_paths->count == 0) {
+        printf("  (none)\n");
+    } else {
+        for (int i = 0; i < config->global_paths->count; i++) {
+            printf("  %s\n", config->global_paths->paths[i]);
+        }
+    }
+    printf("\n");
+
+    char* local_config_path = config_get_local_path(config);
+    printf("Per-directory paths (from %s):\n", local_config_path);
+    free(local_config_path);
+
+    if (config->local_paths->count == 0) {
+        printf("  (none)\n");
+    } else {
+        for (int i = 0; i < config->local_paths->count; i++) {
+            printf("  %s\n", config->local_paths->paths[i]);
+        }
+    }
+    printf("\n");
+
+    printf("Command-line paths:\n");
+    if (config->cli_paths->count == 0) {
+        printf("  (none)\n");
+    } else {
+        for (int i = 0; i < config->cli_paths->count; i++) {
+            printf("  %s\n", config->cli_paths->paths[i]);
+        }
+    }
+
+    free(xdg_config);
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     Arguments* args = parse_arguments(argc, argv);
     if (!args) {
@@ -123,10 +239,52 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    printf("Mode: %d\n", args->mode);
-    printf("Allow-write paths: %d\n", args->allow_write_paths->count);
-    printf("Bash args: %d\n", args->bash_argc);
+    // Create config
+    Config* config = config_create();
+    if (!config) {
+        fprintf(stderr, "Error: Failed to create configuration\n");
+        free_arguments(args);
+        return 1;
+    }
 
+    // Load configs
+    config_load_global(config);
+    config_load_local(config);
+
+    // Add CLI paths
+    for (int i = 0; i < args->allow_write_paths->count; i++) {
+        char* expanded = expand_path(args->allow_write_paths->paths[i]);
+        if (expanded) {
+            pathlist_add(config->cli_paths, expanded);
+            free(expanded);
+        }
+    }
+
+    // Handle different modes
+    int result = 0;
+    switch (args->mode) {
+        case MODE_ADD_PATH:
+            if (args->allow_write_paths->count > 0) {
+                result = handle_add_path(config, args->allow_write_paths->paths[0]);
+            }
+            break;
+        case MODE_REMOVE_PATH:
+            if (args->allow_write_paths->count > 0) {
+                result = handle_remove_path(config, args->allow_write_paths->paths[0]);
+            }
+            break;
+        case MODE_EDIT:
+            result = handle_edit(config);
+            break;
+        case MODE_LIST_PATHS:
+            result = handle_list_paths(config);
+            break;
+        case MODE_SANDBOX:
+            printf("TODO: Launch sandbox\n");
+            break;
+    }
+
+    config_free(config);
     free_arguments(args);
-    return 0;
+    return result;
 }

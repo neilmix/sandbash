@@ -49,4 +49,10 @@ bool config_load_local(Config* config);
 // Get merged list of all writable paths
 PathList* config_get_all_paths(Config* config);
 
+// Save per-directory config
+bool config_save_local(Config* config);
+
+// Get per-directory config path
+char* config_get_local_path(Config* config);
+
 #endif // CONFIG_H

@@ -272,3 +272,78 @@ bool config_load_local(Config* config) {
 
     return parse_config_file(filepath, config->local_paths);
 }
+
+char* config_get_local_path(Config* config) {
+    if (!config) {
+        return NULL;
+    }
+
+    char* hash = compute_path_hash(config->current_dir);
+    if (!hash) {
+        return NULL;
+    }
+
+    char* xdg_config = get_xdg_config_dir();
+    if (!xdg_config) {
+        free(hash);
+        return NULL;
+    }
+
+    char* filepath = malloc(PATH_MAX);
+    if (!filepath) {
+        free(xdg_config);
+        free(hash);
+        return NULL;
+    }
+
+    snprintf(filepath, PATH_MAX, "%s/sandbash/projects/%s",
+             xdg_config, hash);
+
+    free(xdg_config);
+    free(hash);
+
+    return filepath;
+}
+
+bool config_save_local(Config* config) {
+    if (!config) {
+        return false;
+    }
+
+    char* filepath = config_get_local_path(config);
+    if (!filepath) {
+        return false;
+    }
+
+    // Ensure directory exists
+    char* xdg_config = get_xdg_config_dir();
+    if (xdg_config) {
+        char dirpath[PATH_MAX];
+        snprintf(dirpath, sizeof(dirpath), "%s/sandbash/projects", xdg_config);
+        mkdir(xdg_config, 0755);
+
+        char sandbash_dir[PATH_MAX];
+        snprintf(sandbash_dir, sizeof(sandbash_dir), "%s/sandbash", xdg_config);
+        mkdir(sandbash_dir, 0755);
+
+        mkdir(dirpath, 0755);
+        free(xdg_config);
+    }
+
+    FILE* f = fopen(filepath, "w");
+    if (!f) {
+        free(filepath);
+        return false;
+    }
+
+    fprintf(f, "# Per-directory config for: %s\n", config->current_dir);
+    fprintf(f, "# One path per line\n\n");
+
+    for (int i = 0; i < config->local_paths->count; i++) {
+        fprintf(f, "%s\n", config->local_paths->paths[i]);
+    }
+
+    fclose(f);
+    free(filepath);
+    return true;
+}
