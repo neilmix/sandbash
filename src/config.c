@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <limits.h>
 
 PathList* pathlist_create(void) {
     PathList* list = malloc(sizeof(PathList));
@@ -98,9 +100,6 @@ void pathlist_free(PathList* list) {
     free(list);
 }
 
-#include <unistd.h>
-#include <limits.h>
-
 Config* config_create(void) {
     Config* config = malloc(sizeof(Config));
     if (!config) {
@@ -123,6 +122,10 @@ Config* config_create(void) {
         return NULL;
     }
     config->current_dir = strdup(cwd);
+    if (!config->current_dir) {
+        config_free(config);
+        return NULL;
+    }
 
     return config;
 }
