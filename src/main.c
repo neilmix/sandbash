@@ -5,11 +5,20 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <errno.h>
+#include <signal.h>
 #include "config.h"
 #include "sandbox.h"
 #include "utils.h"
 
+#define VERSION "0.1.0"
+
 extern char** environ;
+
+static void signal_handler(int sig) {
+    (void)sig;  // Unused parameter
+    // Just exit cleanly
+    exit(0);
+}
 
 typedef enum {
     MODE_SANDBOX,
@@ -27,6 +36,7 @@ typedef struct {
 } Arguments;
 
 static void print_usage(const char* program_name) {
+    printf("sandbash v%s - Sandboxed bash launcher for macOS\n\n", VERSION);
     printf("Usage: %s [OPTIONS] [BASH_ARGS...]\n", program_name);
     printf("\nSandbox execution:\n");
     printf("  %s [--allow-write=PATH]... [BASH_ARGS...]\n", program_name);
@@ -113,6 +123,13 @@ static int handle_add_path(Config* config, const char* path) {
     if (!expanded) {
         fprintf(stderr, "Error: Invalid path: %s\n", path);
         return 1;
+    }
+
+    // Check if already exists
+    if (pathlist_contains(config->local_paths, expanded)) {
+        printf("Path already in config: %s\n", expanded);
+        free(expanded);
+        return 0;
     }
 
     pathlist_add(config->local_paths, expanded);
@@ -225,6 +242,10 @@ static int handle_list_paths(Config* config) {
 }
 
 int main(int argc, char* argv[]) {
+    // Set up signal handlers
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+
     Arguments* args = parse_arguments(argc, argv);
     if (!args) {
         fprintf(stderr, "Error: Failed to parse arguments\n");
