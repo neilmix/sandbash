@@ -147,20 +147,26 @@ The generated sandbox profile follows this template:
 ### Sandbox Execution
 
 ```bash
-# Interactive sandboxed bash
+# Interactive bash (no command specified)
 sandbash
 
-# Run single command
-sandbash -c "npm install"
+# Execute command directly in sandbox
+sandbash npm install
+sandbash echo "hello world"
+sandbash ./script.sh
 
-# Run script
-sandbash script.sh
+# Execute with temporary writable paths
+sandbash --allow-write=/tmp touch /tmp/test.txt
 
-# Add temporary writable paths
-sandbash --allow-write=/tmp --allow-write=~/Downloads
+# Explicitly execute bash with arguments
+sandbash bash -c "npm install"
 ```
 
-All standard bash flags and arguments pass through unchanged.
+**Argument parsing rules:**
+- All arguments before the command are sandbash options (--allow-write, etc.)
+- First non-option argument is the command to execute
+- All subsequent arguments are passed to the command
+- Configuration operations (--add-path, --list-paths, etc.) cannot be combined with command execution
 
 ### Configuration Management
 

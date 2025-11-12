@@ -1,17 +1,17 @@
 # sandbash
 
-A sandboxed bash launcher for macOS that restricts filesystem write access to designated directories.
+A command sandboxing tool for macOS that restricts filesystem write access to designated directories.
 
 ## Purpose
 
-`sandbash` enables safe AI-assisted development by launching bash in a sandboxed environment where only specific directories are writable. All other filesystem locations remain readable but protected from modification.
+`sandbash` enables safe AI-assisted development by executing commands in a sandboxed environment where only specific directories are writable. All other filesystem locations remain readable but protected from modification.
 
 ## Features
 
 - **Filesystem sandboxing**: Current directory is writable, everything else is read-only by default
+- **Direct command execution**: Run any command in a sandbox, not just bash
 - **Three-tier configuration**: Global config, per-directory config, and command-line flags
 - **Easy config management**: Built-in commands to add, remove, and edit writable paths
-- **Transparent operation**: Works like normal bash with all standard features
 - **Subprocess inheritance**: All child processes automatically inherit sandbox restrictions
 
 ## Quick Start
@@ -21,14 +21,24 @@ A sandboxed bash launcher for macOS that restricts filesystem write access to de
 make
 sudo make install
 
-# Launch sandboxed bash in current directory
+# Launch interactive bash in current directory
 sandbash
+
+# Execute a command in sandbox
+sandbash npm install
+sandbash echo "hello world"
+
+# Execute with temporary writable path
+sandbash --allow-write=/tmp touch /tmp/test.txt
+
+# Explicitly run bash with arguments
+sandbash bash -c "echo test"
 
 # Add a writable path for this directory
 sandbash --add-path /tmp
 
-# Launch with temporary writable path
-sandbash --allow-write=~/Downloads
+# List configured paths
+sandbash --list-paths
 ```
 
 ## Documentation

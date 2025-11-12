@@ -4,6 +4,9 @@ set -e
 
 echo "=== sandbash Manual Test Suite ==="
 echo
+echo "Note: This suite focuses on interactive testing."
+echo "For automated argument parsing tests, run: ./test/test_argument_parsing.sh"
+echo
 
 # Test 1: Help message
 echo "Test 1: Help message"

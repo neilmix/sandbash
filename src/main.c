@@ -284,6 +284,15 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // Check for invalid combination: config operation + command
+    if (args->mode != MODE_SANDBOX && args->bash_argc > 0) {
+        fprintf(stderr, "Error: Cannot combine configuration operations with command execution\n");
+        fprintf(stderr, "Use config operations alone or execute commands separately.\n");
+        config_free(config);
+        free_arguments(args);
+        return 1;
+    }
+
     // Handle different modes
     int result = 0;
     switch (args->mode) {
@@ -322,21 +331,32 @@ int main(int argc, char* argv[]) {
 
             free(profile);
 
-            // Prepare bash arguments
-            int bash_argc = args->bash_argc + 1;
-            char** bash_argv = malloc((bash_argc + 1) * sizeof(char*));
-            bash_argv[0] = "/bin/bash";
-            for (int i = 0; i < args->bash_argc; i++) {
-                bash_argv[i + 1] = args->bash_argv[i];
+            // If no command specified, launch interactive bash
+            if (args->bash_argc == 0) {
+                char* bash_argv[] = {"/bin/bash", NULL};
+                execve("/bin/bash", bash_argv, environ);
+
+                // If we get here, execve failed
+                fprintf(stderr, "Error: Failed to launch bash: %s\n", strerror(errno));
+                result = 1;
+                break;
             }
-            bash_argv[bash_argc] = NULL;
 
-            // Launch bash
-            execve("/bin/bash", bash_argv, environ);
+            // Otherwise, execute the specified command
+            // Prepare command arguments (command is already in bash_argv[0])
+            char** cmd_argv = malloc((args->bash_argc + 1) * sizeof(char*));
+            for (int i = 0; i < args->bash_argc; i++) {
+                cmd_argv[i] = args->bash_argv[i];
+            }
+            cmd_argv[args->bash_argc] = NULL;
 
-            // If we get here, execve failed
-            fprintf(stderr, "Error: Failed to launch bash: %s\n", strerror(errno));
-            free(bash_argv);
+            // Execute command using execvp (searches PATH)
+            execvp(cmd_argv[0], cmd_argv);
+
+            // If we get here, execvp failed
+            fprintf(stderr, "Error: Failed to execute '%s': %s\n",
+                    cmd_argv[0], strerror(errno));
+            free(cmd_argv);
             result = 1;
             break;
         }
