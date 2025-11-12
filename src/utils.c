@@ -34,8 +34,8 @@ char* expand_path(const char* path) {
 
     char expanded[PATH_MAX];
 
-    // Handle tilde expansion
-    if (path[0] == '~') {
+    // Handle tilde expansion (only ~ for current user, not ~username)
+    if (path[0] == '~' && (path[1] == '/' || path[1] == '\0')) {
         const char* home = getenv("HOME");
         if (!home) {
             struct passwd* pw = getpwuid(getuid());
@@ -45,6 +45,9 @@ char* expand_path(const char* path) {
             return NULL;
         }
         snprintf(expanded, sizeof(expanded), "%s%s", home, path + 1);
+    } else if (path[0] == '~') {
+        // ~username syntax not supported
+        return NULL;
     } else {
         strncpy(expanded, path, sizeof(expanded) - 1);
         expanded[sizeof(expanded) - 1] = '\0';
