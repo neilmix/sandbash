@@ -38,9 +38,11 @@ char* sandbox_generate_profile(Config* config) {
         "(version 1)\n"
         "(deny default)\n"
         "(allow process*)\n"
-        "(allow sysctl-read)\n"
+        "(allow sysctl*)\n"
         "(allow mach-lookup)\n"
         "(allow ipc-posix-shm)\n"
+        "(allow file-ioctl)\n"
+        "(allow signal (target self))\n"
         "(allow network*)\n"
         "(allow file-read*)\n"
         "(deny file-write*)\n");
