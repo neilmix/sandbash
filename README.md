@@ -23,7 +23,8 @@ This uses deprecated APIs that Apple uses privately for its own first-party tool
 make
 sudo make install
 
-# Launch interactive bash in current directory
+# Launch interactive shell in current directory
+# Uses your $SHELL (or /bin/bash if not set)
 sandbash
 
 # Execute a command in sandbox
@@ -33,8 +34,9 @@ sandbash echo "hello world"
 # Execute with temporary writable path
 sandbash --allow-write=/tmp touch /tmp/test.txt
 
-# Explicitly run bash with arguments
+# Explicitly run a specific shell with arguments
 sandbash bash -c "echo test"
+sandbash zsh -c "echo test"
 
 # Add a writable path for this directory
 sandbash --add-path /tmp
@@ -42,6 +44,8 @@ sandbash --add-path /tmp
 # List configured paths
 sandbash --list-paths
 ```
+
+**Shell Selection:** When launched without arguments, sandbash automatically uses your preferred shell from the `$SHELL` environment variable. If `$SHELL` isn't set or points to a non-existent shell, it falls back to `/bin/bash`.
 
 Global configuration is stored in ~/.config/sandbash/config
 

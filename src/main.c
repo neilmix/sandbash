@@ -241,6 +241,24 @@ static int handle_list_paths(Config* config) {
     return 0;
 }
 
+// Get shell path from $SHELL with fallback to /bin/bash
+static const char* get_shell_path(void) {
+    const char* shell = getenv("SHELL");
+
+    // If SHELL is not set or empty, use /bin/bash
+    if (!shell || !*shell) {
+        return "/bin/bash";
+    }
+
+    // Check if the shell exists and is executable
+    if (access(shell, X_OK) == 0) {
+        return shell;
+    }
+
+    // Fall back to /bin/bash if SHELL points to non-existent/non-executable file
+    return "/bin/bash";
+}
+
 int main(int argc, char* argv[]) {
     // Set up signal handlers
     signal(SIGINT, signal_handler);
@@ -331,13 +349,14 @@ int main(int argc, char* argv[]) {
 
             free(profile);
 
-            // If no command specified, launch interactive bash
+            // If no command specified, launch interactive shell
             if (args->bash_argc == 0) {
-                char* bash_argv[] = {"/bin/bash", NULL};
-                execve("/bin/bash", bash_argv, environ);
+                const char* shell_path = get_shell_path();
+                char* shell_argv[] = {(char*)shell_path, NULL};
+                execve(shell_path, shell_argv, environ);
 
                 // If we get here, execve failed
-                fprintf(stderr, "Error: Failed to launch bash: %s\n", strerror(errno));
+                fprintf(stderr, "Error: Failed to launch shell: %s\n", strerror(errno));
                 result = 1;
                 break;
             }
