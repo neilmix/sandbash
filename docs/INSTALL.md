@@ -65,6 +65,9 @@ cat > ~/.config/sandbash/config <<EOF
 EOF
 ```
 
+Config format is a list of writeable files and directories one per line.
+Comment lines begin with #
+
 ## Code Signing (Optional)
 
 If you encounter sandbox initialization errors, the binary may need code signing:

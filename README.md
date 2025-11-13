@@ -14,6 +14,8 @@ A command sandboxing tool for macOS that restricts filesystem write access to de
 - **Easy config management**: Built-in commands to add, remove, and edit writable paths
 - **Subprocess inheritance**: All child processes automatically inherit sandbox restrictions
 
+This uses deprecated APIs that Apple uses privately for its own first-party tools. Caveat emptor.
+
 ## Quick Start
 
 ```bash
@@ -41,10 +43,18 @@ sandbash --add-path /tmp
 sandbash --list-paths
 ```
 
+Global configuration is stored in ~/.config/sandbash/config
+
+Here is an example config for claude code:
+```
+# enable claude code for --dangerously-skip-permissions
+~/.claude
+~/.claude.json
+```
+
 ## Documentation
 
 - [Installation Guide](docs/INSTALL.md)
-- [Design Document](docs/plans/2025-11-12-sandbash-design.md)
 
 ## Requirements
 
