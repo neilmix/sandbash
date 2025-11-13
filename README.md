@@ -4,25 +4,57 @@ A command sandboxing tool for macOS that restricts filesystem write access to de
 
 ## Purpose
 
-`sandbash` enables safe AI-assisted development by executing commands in a sandboxed environment where only specific directories are writable. All other filesystem locations remain readable but protected from modification.
+`sandbash` enables safe AI-assisted development by executing commands in a sandboxed environment where only specific directories or files are writable. All other filesystem locations remain readable but protected from modification.
 
 ## Features
 
 - **Filesystem sandboxing**: Current directory is writable, everything else is read-only by default
 - **Direct command execution**: Run any command in a sandbox, not just bash
 - **Three-tier configuration**: Global config, per-directory config, and command-line flags
-- **Easy config management**: Built-in commands to add, remove, and edit writable paths
+- **Easy config management**: Built-in commands to add, remove, and edit writable paths for the local directory
 - **Subprocess inheritance**: All child processes automatically inherit sandbox restrictions
 
-This uses deprecated APIs that Apple uses privately for its own first-party tools. Caveat emptor.
+sanbash uses deprecated APIs that Apple uses privately for its own first-party tools. Caveat emptor.
 
-## Quick Start
+## Requirements
 
+- macOS 10.10 or later
+- Xcode Command Line Tools (for clang)
+- Must be invoked from within your home directory
+
+## Installation
+
+Install Xcode Command Line Tools if not already present:
 ```bash
-# Build and install
+xcode-select --install
+```
+
+Build and install:
+```bash
 make
 sudo make install
+```
 
+This installs `sandbash` to `/usr/local/bin/`.
+
+Verify installation:
+```bash
+# Should print usage
+sandbash --help
+
+# Should show current directory
+sandbash --list-paths
+```
+
+### Uninstalling
+
+```bash
+sudo make uninstall
+```
+
+## Usage
+
+```bash
 # Launch interactive shell in current directory
 # Uses your $SHELL (or /bin/bash if not set)
 sandbash
@@ -45,26 +77,33 @@ sandbash --add-path /tmp
 sandbash --list-paths
 ```
 
-**Shell Selection:** When launched without arguments, sandbash automatically uses your preferred shell from the `$SHELL` environment variable. If `$SHELL` isn't set or points to a non-existent shell, it falls back to `/bin/bash`.
+## Configuration
 
-Global configuration is stored in ~/.config/sandbash/config
+Configuration files are stored in `~/.config/sandbash/` following the XDG Base Directory specification:
 
-Here is an example config for claude code:
+- Global config: `~/.config/sandbash/config`
+- Per-directory configs: `~/.config/sandbash/projects/<hash>`
+
+Config format is a list of writable files and directories, one per line. Comment lines begin with `#`.
+
+Create a global config:
+```bash
+mkdir -p ~/.config/sandbash
+cat > ~/.config/sandbash/config <<EOF
+# Global writable paths
+/tmp
+~/Downloads
+EOF
 ```
-# enable claude code for --dangerously-skip-permissions
+
+Example config for Claude Code:
+```
+# Enable Claude Code for --dangerously-skip-permissions
 ~/.claude
 ~/.claude.json
 ```
 
-## Documentation
-
-- [Installation Guide](docs/INSTALL.md)
-
-## Requirements
-
-- macOS 10.10 or later
-- Xcode Command Line Tools (for clang)
-- Must be invoked from within your home directory
+**Shell Selection:** When launched without arguments, sandbash automatically uses your preferred shell from the `$SHELL` environment variable. If `$SHELL` isn't set or points to a non-existent shell, it falls back to `/bin/bash`.
 
 ## Security Model
 
@@ -77,6 +116,12 @@ Here is an example config for claude code:
 - Network-based attacks (network unrestricted)
 - Reading sensitive files (filesystem is readable)
 - Resource exhaustion
+
+## Troubleshooting
+
+### "must be invoked from within your home directory"
+
+`sandbash` enforces that you can only run it from subdirectories of your home directory. Navigate to your home directory or a project within it.
 
 ## License
 
