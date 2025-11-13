@@ -7,6 +7,26 @@
 #include <limits.h>
 #include <sys/stat.h>
 
+#define MAX_CONFIG_PATHS 1000
+
+static bool is_valid_config_path(const char* path) {
+    if (!path || !*path) {
+        return false;
+    }
+
+    // Path must be absolute
+    if (path[0] != '/') {
+        return false;
+    }
+
+    // Reject paths with dangerous characters that could break sandbox profile
+    if (strpbrk(path, "\"\n\r")) {
+        return false;
+    }
+
+    return true;
+}
+
 static bool parse_config_file(const char* filepath, PathList* list) {
     if (!filepath || !list) {
         return false;
@@ -24,10 +44,20 @@ static bool parse_config_file(const char* filepath, PathList* list) {
     while (fgets(line, sizeof(line), f)) {
         line_num++;
 
+        // Check for maximum paths limit
+        if (list->count >= MAX_CONFIG_PATHS) {
+            fprintf(stderr, "Warning: Maximum paths (%d) exceeded, ignoring remaining lines\n",
+                    MAX_CONFIG_PATHS);
+            break;
+        }
+
         // Remove newline
         size_t len = strlen(line);
         if (len > 0 && line[len - 1] == '\n') {
             line[len - 1] = '\0';
+        } else if (len > 0 && !feof(f)) {
+            // Line was truncated (too long)
+            fprintf(stderr, "Warning: Line %d too long, truncated\n", line_num);
         }
 
         // Skip empty lines and comments
@@ -49,13 +79,22 @@ static bool parse_config_file(const char* filepath, PathList* list) {
 
         // Expand and add path
         char* expanded = expand_path(trimmed);
-        if (expanded) {
-            pathlist_add(list, expanded);
-            free(expanded);
-        } else {
-            fprintf(stderr, "Warning: Invalid path on line %d: %s\n",
+        if (!expanded) {
+            fprintf(stderr, "Warning: Failed to expand path on line %d: %s\n",
                     line_num, trimmed);
+            continue;
         }
+
+        // Validate the expanded path
+        if (!is_valid_config_path(expanded)) {
+            fprintf(stderr, "Warning: Invalid path on line %d: %s\n",
+                    line_num, expanded);
+            free(expanded);
+            continue;
+        }
+
+        pathlist_add(list, expanded);
+        free(expanded);
     }
 
     fclose(f);

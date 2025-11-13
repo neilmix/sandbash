@@ -13,6 +13,38 @@
 #include <string.h>
 #include <sandbox.h>
 
+char* escape_sandbox_string(const char* str) {
+    if (!str) {
+        return NULL;
+    }
+
+    // Count characters that need escaping (quotes and backslashes)
+    size_t extra = 0;
+    for (const char* p = str; *p; p++) {
+        if (*p == '"' || *p == '\\') {
+            extra++;
+        }
+    }
+
+    // Allocate new string with space for escape characters
+    char* escaped = malloc(strlen(str) + extra + 1);
+    if (!escaped) {
+        return NULL;
+    }
+
+    // Copy string, inserting backslashes before quotes and backslashes
+    char* out = escaped;
+    for (const char* p = str; *p; p++) {
+        if (*p == '"' || *p == '\\') {
+            *out++ = '\\';
+        }
+        *out++ = *p;
+    }
+    *out = '\0';
+
+    return escaped;
+}
+
 char* sandbox_generate_profile(Config* config) {
     if (!config) {
         return NULL;
@@ -49,9 +81,17 @@ char* sandbox_generate_profile(Config* config) {
 
     // Add write permissions for each path
     for (int i = 0; i < all_paths->count; i++) {
+        char* escaped = escape_sandbox_string(all_paths->paths[i]);
+        if (!escaped) {
+            free(profile);
+            pathlist_free(all_paths);
+            return NULL;
+        }
+
         offset += snprintf(profile + offset, buffer_size - offset,
             "(allow file-write* (subpath \"%s\"))\n",
-            all_paths->paths[i]);
+            escaped);
+        free(escaped);
 
         if (offset >= buffer_size - 512) {
             // Need more space

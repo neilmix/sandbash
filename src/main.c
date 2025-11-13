@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/wait.h>
 #include "config.h"
 #include "sandbox.h"
 #include "utils.h"
@@ -187,17 +188,42 @@ static int handle_edit(Config* config) {
     }
 
     const char* editor = getenv("EDITOR");
-    if (!editor) {
+    if (!editor || !*editor) {
         editor = "vi";
     }
 
-    char command[PATH_MAX + 100];
-    snprintf(command, sizeof(command), "%s %s", editor, config_path);
+    // Use fork/exec instead of system() to prevent command injection
+    pid_t pid = fork();
+    if (pid == -1) {
+        fprintf(stderr, "Error: Failed to fork: %s\n", strerror(errno));
+        free(config_path);
+        return 1;
+    }
 
-    int result = system(command);
+    if (pid == 0) {
+        // Child process - exec the editor
+        execlp(editor, editor, config_path, NULL);
+        // If we get here, exec failed
+        fprintf(stderr, "Error: Failed to launch editor '%s': %s\n",
+                editor, strerror(errno));
+        exit(1);
+    }
+
+    // Parent process - wait for child
+    int status;
+    if (waitpid(pid, &status, 0) == -1) {
+        fprintf(stderr, "Error: Failed to wait for editor: %s\n", strerror(errno));
+        free(config_path);
+        return 1;
+    }
+
     free(config_path);
 
-    return result;
+    if (WIFEXITED(status)) {
+        return WEXITSTATUS(status);
+    }
+
+    return 1;
 }
 
 static int handle_list_paths(Config* config) {
