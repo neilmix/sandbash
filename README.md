@@ -117,6 +117,16 @@ Example config for Claude Code:
 - Reading sensitive files (filesystem is readable)
 - Resource exhaustion
 
+**Known Limitations:**
+- **Setuid/setgid binaries cannot be executed** - The sandbox enforces `forbidden-exec-sugid` to prevent privilege escalation. Common affected tools include:
+  - `/bin/ps` - Process monitoring
+  - `/usr/bin/top` - Real-time process viewer
+  - `/usr/bin/sudo`, `/usr/bin/su` - Privilege escalation
+  - `/usr/bin/crontab` - Job scheduling
+  - `/usr/sbin/traceroute` - Network diagnostics
+
+  This is a fundamental macOS security feature. Non-setuid alternatives (like `ls`, `grep`, `whoami`, `uname`, etc.) work normally.
+
 ## Troubleshooting
 
 ### "must be invoked from within your home directory"
