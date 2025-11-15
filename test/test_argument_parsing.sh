@@ -93,12 +93,12 @@ run_test "Command with option-like arguments" \
 
 # Test 11: Write restrictions still work
 echo "Test 11: Write restrictions work with direct execution"
-if ./sandbash touch /tmp/test_$$.txt && [ -f /tmp/test_$$.txt ]; then
+if ./sandbash --allow-write=/tmp touch /tmp/test_$$.txt && [ -f /tmp/test_$$.txt ]; then
     rm -f /tmp/test_$$.txt
-    echo "  ✓ PASS: Can write to /tmp"
+    echo "  ✓ PASS: Can write to /tmp with --allow-write"
     ((PASS++))
 else
-    echo "  ✗ FAIL: Should be able to write to /tmp"
+    echo "  ✗ FAIL: Should be able to write to /tmp with --allow-write"
     ((FAIL++))
 fi
 
