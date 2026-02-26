@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd sandbash design document\n\nComplete design for sandboxed bash tool with:\n- macOS Sandbox API implementation\n- Three-tier configuration system (global, per-directory, CLI)\n- XDG-compliant config storage outside sandbox\n- Home directory restriction for security\n- Config management commands\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Skill(superpowers:using-git-worktrees)",
+      "Bash(test:*)",
+      "Bash(git commit:*)",
+      "Bash(git worktree:*)",
+      "Skill(superpowers:writing-plans)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Bash(git rev-parse:*)",
+      "Bash(make:*)",
+      "Bash(/Users/nmix/sandbash/.worktrees/implement-sandbash/sandbash)",
+      "Bash(git rm:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(./sandbash)",
+      "Bash(nm:*)",
+      "Bash(./sandbash:*)",
+      "Bash(clang:*)",
+      "Bash(./test_config:*)",
+      "Bash(./test_parse)",
+      "Bash(./test_local_config)",
+      "Bash(chmod:*)",
+      "Skill(superpowers:finishing-a-development-branch)",
+      "Bash(./test/manual_tests.sh)",
+      "Skill(superpowers:test-driven-development)",
+      "Bash(./test/test_argument_parsing.sh)",
+      "Bash(./test/test_shell_selection.sh:*)",
+      "Bash(./test/test_sandbox_escaping.sh)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

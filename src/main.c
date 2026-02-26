@@ -316,8 +316,18 @@ int main(int argc, char* argv[]) {
     }
 
     // Load configs
-    config_load_global(config);
-    config_load_local(config);
+    if (!config_load_global(config)) {
+        fprintf(stderr, "Error: Failed to load global configuration\n");
+        config_free(config);
+        free_arguments(args);
+        return 1;
+    }
+    if (!config_load_local(config)) {
+        fprintf(stderr, "Error: Failed to load local configuration\n");
+        config_free(config);
+        free_arguments(args);
+        return 1;
+    }
 
     // Add CLI paths
     for (int i = 0; i < args->allow_write_paths->count; i++) {

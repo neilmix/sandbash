@@ -80,17 +80,19 @@ static bool parse_config_file(const char* filepath, PathList* list) {
         // Expand and add path
         char* expanded = expand_path(trimmed);
         if (!expanded) {
-            fprintf(stderr, "Warning: Failed to expand path on line %d: %s\n",
+            fprintf(stderr, "Error: Directory not found on line %d: %s\n",
                     line_num, trimmed);
-            continue;
+            fclose(f);
+            return false;
         }
 
         // Validate the expanded path
         if (!is_valid_config_path(expanded)) {
-            fprintf(stderr, "Warning: Invalid path on line %d: %s\n",
+            fprintf(stderr, "Error: Invalid path on line %d: %s\n",
                     line_num, expanded);
             free(expanded);
-            continue;
+            fclose(f);
+            return false;
         }
 
         pathlist_add(list, expanded);

@@ -1,0 +1,146 @@
+#!/bin/bash
+# Test suite for config error handling
+# Verifies that invalid/missing paths in config cause hard errors
+
+set -e
+
+echo "=== Config Error Handling Test Suite ==="
+echo
+
+PASS=0
+FAIL=0
+
+inc_pass() { PASS=$((PASS + 1)); }
+inc_fail() { FAIL=$((FAIL + 1)); }
+
+# Use isolated config dir for each test
+setup_config() {
+    TEST_CONFIG=$(mktemp -d)
+    mkdir -p "$TEST_CONFIG/sandbash/projects"
+    export XDG_CONFIG_HOME="$TEST_CONFIG"
+}
+
+teardown_config() {
+    rm -rf "$TEST_CONFIG"
+    unset XDG_CONFIG_HOME
+}
+
+# Test 1: Nonexistent absolute path in global config
+echo "Test 1: Nonexistent absolute path in global config"
+setup_config
+echo "/nonexistent/path/abc123" > "$TEST_CONFIG/sandbash/config"
+if OUTPUT=$(./sandbash --list-paths 2>&1); then
+    echo "  ✗ FAIL: Should have exited with error"
+    inc_fail
+else
+    if echo "$OUTPUT" | grep -q "Error: Directory not found.*nonexistent"; then
+        echo "  ✓ PASS: Errors on nonexistent absolute path"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Wrong error message: $OUTPUT"
+        inc_fail
+    fi
+fi
+teardown_config
+echo
+
+# Test 2: Nonexistent tilde path in global config
+echo "Test 2: Nonexistent tilde path in global config"
+setup_config
+echo "~/nonexistent_dir_xyz789" > "$TEST_CONFIG/sandbash/config"
+if OUTPUT=$(./sandbash --list-paths 2>&1); then
+    echo "  ✗ FAIL: Should have exited with error"
+    inc_fail
+else
+    if echo "$OUTPUT" | grep -q "Error: Directory not found"; then
+        echo "  ✓ PASS: Errors on nonexistent tilde path"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Wrong error message: $OUTPUT"
+        inc_fail
+    fi
+fi
+teardown_config
+echo
+
+# Test 3: Nonexistent path in local (per-directory) config
+echo "Test 3: Nonexistent path in local config"
+setup_config
+# Get the project hash by running list-paths first
+HASH=$(./sandbash --list-paths 2>/dev/null | grep "Per-directory" | grep -oE '[a-f0-9]{16}')
+echo "/does/not/exist" > "$TEST_CONFIG/sandbash/projects/$HASH"
+if OUTPUT=$(./sandbash --list-paths 2>&1); then
+    echo "  ✗ FAIL: Should have exited with error"
+    inc_fail
+else
+    if echo "$OUTPUT" | grep -q "Error:.*load local configuration"; then
+        echo "  ✓ PASS: Errors on nonexistent path in local config"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Wrong error message: $OUTPUT"
+        inc_fail
+    fi
+fi
+teardown_config
+echo
+
+# Test 4: Valid path in global config still works
+echo "Test 4: Valid path in global config succeeds"
+setup_config
+echo "/tmp" > "$TEST_CONFIG/sandbash/config"
+if OUTPUT=$(./sandbash --list-paths 2>&1); then
+    if echo "$OUTPUT" | grep -q "/tmp\|/private/tmp"; then
+        echo "  ✓ PASS: Valid path loads successfully"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Valid path not in output: $OUTPUT"
+        inc_fail
+    fi
+else
+    echo "  ✗ FAIL: Should have succeeded with valid path"
+    inc_fail
+fi
+teardown_config
+echo
+
+# Test 5: Empty config file is fine
+echo "Test 5: Empty config file succeeds"
+setup_config
+touch "$TEST_CONFIG/sandbash/config"
+if ./sandbash --list-paths > /dev/null 2>&1; then
+    echo "  ✓ PASS: Empty config works"
+    inc_pass
+else
+    echo "  ✗ FAIL: Empty config should not error"
+    inc_fail
+fi
+teardown_config
+echo
+
+# Test 6: Comments-only config file is fine
+echo "Test 6: Comments-only config file succeeds"
+setup_config
+printf "# just a comment\n# another comment\n" > "$TEST_CONFIG/sandbash/config"
+if ./sandbash --list-paths > /dev/null 2>&1; then
+    echo "  ✓ PASS: Comments-only config works"
+    inc_pass
+else
+    echo "  ✗ FAIL: Comments-only config should not error"
+    inc_fail
+fi
+teardown_config
+echo
+
+# Summary
+echo "=== Test Results ==="
+echo "PASS: $PASS"
+echo "FAIL: $FAIL"
+echo
+
+if [ $FAIL -eq 0 ]; then
+    echo "All tests passed!"
+    exit 0
+else
+    echo "Some tests failed!"
+    exit 1
+fi

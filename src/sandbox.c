@@ -77,6 +77,8 @@ char* sandbox_generate_profile(Config* config) {
         "(allow signal (target self))\n"
         "(allow network*)\n"
         "(allow file-read*)\n"
+        "(allow file-read-metadata)\n"
+        "(allow file-map-executable)\n"
         "(deny file-write*)\n");
 
     // Add write permissions for each path
