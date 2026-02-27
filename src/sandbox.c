@@ -72,6 +72,8 @@ char* sandbox_generate_profile(Config* config) {
         "(allow process*)\n"
         "(allow sysctl*)\n"
         "(allow mach-lookup)\n"
+        "(allow mach-register)\n"
+        "(allow iokit-open)\n"
         "(allow ipc-posix-shm)\n"
         "(allow file-ioctl)\n"
         "(allow signal (target self))\n"
