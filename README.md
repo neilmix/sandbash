@@ -66,6 +66,9 @@ sandbash echo "hello world"
 # Execute with temporary writable path
 sandbash --allow-write=/private/tmp touch /tmp/test.txt
 
+# Allow sending signals to other processes
+sandbash --allow-signal my-tool
+
 # Explicitly run a specific shell with arguments
 sandbash bash -c "echo test"
 sandbash zsh -c "echo test"
@@ -118,6 +121,7 @@ Example config for Claude Code:
 - Network-based attacks (network unrestricted)
 - Reading sensitive files (filesystem is readable)
 - Resource exhaustion
+- Signal delivery to other processes (when `--allow-signal` is used)
 
 **Known Limitations:**
 - **Setuid/setgid binaries cannot be executed** - The sandbox enforces `forbidden-exec-sugid` to prevent privilege escalation. Common affected tools include:

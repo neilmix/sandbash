@@ -5,7 +5,7 @@
 #include <stdbool.h>
 
 // Generate sandbox profile from config
-char* sandbox_generate_profile(Config* config);
+char* sandbox_generate_profile(Config* config, bool allow_signal);
 
 // Initialize sandbox with profile
 bool sandbox_init_with_profile(const char* profile);

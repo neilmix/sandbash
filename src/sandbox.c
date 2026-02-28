@@ -45,7 +45,7 @@ char* escape_sandbox_string(const char* str) {
     return escaped;
 }
 
-char* sandbox_generate_profile(Config* config) {
+char* sandbox_generate_profile(Config* config, bool allow_signal) {
     if (!config) {
         return NULL;
     }
@@ -66,6 +66,10 @@ char* sandbox_generate_profile(Config* config) {
     size_t offset = 0;
 
     // Profile header
+    const char* signal_rule = allow_signal
+        ? "(allow signal)"
+        : "(allow signal (target self))";
+
     offset += snprintf(profile + offset, buffer_size - offset,
         "(version 1)\n"
         "(deny default)\n"
@@ -76,12 +80,13 @@ char* sandbox_generate_profile(Config* config) {
         "(allow iokit-open)\n"
         "(allow ipc-posix-shm)\n"
         "(allow file-ioctl)\n"
-        "(allow signal (target self))\n"
+        "%s\n"
         "(allow network*)\n"
         "(allow file-read*)\n"
         "(allow file-read-metadata)\n"
         "(allow file-map-executable)\n"
-        "(deny file-write*)\n");
+        "(deny file-write*)\n",
+        signal_rule);
 
     // Add write permissions for each path
     for (int i = 0; i < all_paths->count; i++) {

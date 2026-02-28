@@ -18,9 +18,12 @@ Shell scripts in `test/`. No `make test` target — run individually:
 ```
 bash test/test_argument_parsing.sh
 bash test/test_config_errors.sh
+bash test/test_allow_signal.sh
 ```
 
 `test/manual_tests.sh` requires interactive input.
+
+Sandbox-dependent tests (most of `test_argument_parsing.sh` and all of `test_allow_signal.sh`) require the binary to be code-signed. In unsigned dev builds they fail with "Operation not permitted" — this is expected. Only config-management and error-handling tests pass without signing.
 
 ## Key conventions
 
