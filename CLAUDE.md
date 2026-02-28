@@ -25,5 +25,11 @@ bash test/test_config_errors.sh
 ## Key conventions
 
 - Config parsing is strict: missing directories and invalid paths are hard errors (not warnings)
-- `expand_path()` uses `realpath()` — returns NULL for nonexistent paths
+- Symlinked paths are rejected everywhere (config files, `--allow-write`, `--add-path`) — user must specify canonical paths. Uses `expand_tilde()` vs `expand_path()` comparison to detect symlinks.
+- `expand_tilde()` does `~` expansion only; `expand_path()` does `~` expansion + `realpath()`
 - Config load failures in `main.c` must be checked and cause exit(1)
+
+## Test conventions
+
+- All tests must isolate config via `setup_config`/`teardown_config` setting `XDG_CONFIG_HOME` to a temp dir
+- Use `inc_pass`/`inc_fail` helper functions, never `((VAR++))` — the latter returns exit code 1 when VAR=0, which kills scripts under `set -e`

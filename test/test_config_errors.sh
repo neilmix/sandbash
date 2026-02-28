@@ -84,12 +84,12 @@ fi
 teardown_config
 echo
 
-# Test 4: Valid path in global config still works
+# Test 4: Valid path in global config still works (use canonical path, not symlink)
 echo "Test 4: Valid path in global config succeeds"
 setup_config
-echo "/tmp" > "$TEST_CONFIG/sandbash/config"
+echo "/private/tmp" > "$TEST_CONFIG/sandbash/config"
 if OUTPUT=$(./sandbash --list-paths 2>&1); then
-    if echo "$OUTPUT" | grep -q "/tmp\|/private/tmp"; then
+    if echo "$OUTPUT" | grep -q "/private/tmp"; then
         echo "  ✓ PASS: Valid path loads successfully"
         inc_pass
     else
@@ -127,6 +127,88 @@ if ./sandbash --list-paths > /dev/null 2>&1; then
 else
     echo "  ✗ FAIL: Comments-only config should not error"
     inc_fail
+fi
+teardown_config
+echo
+
+# Test 7: Symlinked path in global config is rejected
+echo "Test 7: Symlinked path /tmp is rejected (symlink to /private/tmp)"
+setup_config
+echo "/tmp" > "$TEST_CONFIG/sandbash/config"
+if OUTPUT=$(./sandbash --list-paths 2>&1); then
+    echo "  ✗ FAIL: Should have exited with error for symlinked path"
+    inc_fail
+else
+    if echo "$OUTPUT" | grep -q "symlink" && echo "$OUTPUT" | grep -q "/private/tmp"; then
+        echo "  ✓ PASS: Rejects symlinked path with helpful message"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Wrong error message (expected symlink warning with resolved path): $OUTPUT"
+        inc_fail
+    fi
+fi
+teardown_config
+echo
+
+# Test 8: Symlinked path in local config is rejected
+echo "Test 8: Symlinked path in local (per-directory) config is rejected"
+setup_config
+HASH=$(./sandbash --list-paths 2>/dev/null | grep "Per-directory" | grep -oE '[a-f0-9]{16}')
+echo "/tmp" > "$TEST_CONFIG/sandbash/projects/$HASH"
+if OUTPUT=$(./sandbash --list-paths 2>&1); then
+    echo "  ✗ FAIL: Should have exited with error for symlinked path in local config"
+    inc_fail
+else
+    if echo "$OUTPUT" | grep -q "symlink" && echo "$OUTPUT" | grep -q "/private/tmp"; then
+        echo "  ✓ PASS: Rejects symlinked path in local config"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Wrong error message: $OUTPUT"
+        inc_fail
+    fi
+fi
+teardown_config
+echo
+
+# Test 9: Custom symlink to a directory is rejected
+echo "Test 9: Custom symlink to directory is rejected"
+setup_config
+REAL_DIR=$(mktemp -d)
+LINK_DIR=$(mktemp -d)
+rmdir "$LINK_DIR"
+ln -s "$REAL_DIR" "$LINK_DIR"
+echo "$LINK_DIR" > "$TEST_CONFIG/sandbash/config"
+if OUTPUT=$(./sandbash --list-paths 2>&1); then
+    echo "  ✗ FAIL: Should have exited with error for symlinked path"
+    inc_fail
+else
+    if echo "$OUTPUT" | grep -q "symlink" && echo "$OUTPUT" | grep -q "$REAL_DIR"; then
+        echo "  ✓ PASS: Rejects custom symlink with resolved path in message"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Wrong error message: $OUTPUT"
+        inc_fail
+    fi
+fi
+rm -f "$LINK_DIR"
+rm -rf "$REAL_DIR"
+teardown_config
+echo
+
+# Test 10: Symlinked path via --allow-write is rejected
+echo "Test 10: Symlinked --allow-write path is rejected"
+setup_config
+if OUTPUT=$(./sandbash --allow-write=/tmp echo hello 2>&1); then
+    echo "  ✗ FAIL: Should have exited with error for symlinked --allow-write path"
+    inc_fail
+else
+    if echo "$OUTPUT" | grep -q "symlink" && echo "$OUTPUT" | grep -q "/private/tmp"; then
+        echo "  ✓ PASS: Rejects symlinked --allow-write path"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Wrong error message: $OUTPUT"
+        inc_fail
+    fi
 fi
 teardown_config
 echo

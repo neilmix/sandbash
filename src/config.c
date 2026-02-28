@@ -86,6 +86,20 @@ static bool parse_config_file(const char* filepath, PathList* list) {
             return false;
         }
 
+        // Reject paths that contain symlinks
+        char* tilde_expanded = expand_tilde(trimmed);
+        if (tilde_expanded && strcmp(tilde_expanded, expanded) != 0) {
+            fprintf(stderr, "Error: Path contains a symlink on line %d: %s\n"
+                            "  Resolves to: %s\n"
+                            "  Use the resolved path to avoid ambiguity.\n",
+                    line_num, trimmed, expanded);
+            free(tilde_expanded);
+            free(expanded);
+            fclose(f);
+            return false;
+        }
+        free(tilde_expanded);
+
         // Validate the expanded path
         if (!is_valid_config_path(expanded)) {
             fprintf(stderr, "Error: Invalid path on line %d: %s\n",

@@ -10,13 +10,19 @@ echo
 PASS=0
 FAIL=0
 
-# Test helper program that uses the escaping function
-cat > test_escape_helper.c <<'EOF'
+inc_pass() { PASS=$((PASS + 1)); }
+inc_fail() { FAIL=$((FAIL + 1)); }
+
+# Build test helper in a temp directory
+TEST_DIR=$(mktemp -d)
+trap "rm -rf $TEST_DIR" EXIT
+
+cat > "$TEST_DIR/test_escape_helper.c" <<'EOF'
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Function to test - should escape quotes and backslashes
+// Function to test - defined in sandbox.o
 char* escape_sandbox_string(const char* str);
 
 int main(int argc, char* argv[]) {
@@ -37,15 +43,12 @@ int main(int argc, char* argv[]) {
 }
 EOF
 
-# Try to compile and link with sandbox.o
 echo "Compiling test helper..."
-if ! clang -o test_escape_helper test_escape_helper.c src/sandbox.o src/config.o src/utils.o -framework Security -framework CoreFoundation 2>&1 | grep -v "Undefined symbols"; then
-    echo "✗ EXPECTED FAILURE: escape_sandbox_string() function doesn't exist yet"
-    echo
-    rm -f test_escape_helper test_escape_helper.c
+if ! clang -o "$TEST_DIR/test_escape_helper" "$TEST_DIR/test_escape_helper.c" \
+    src/sandbox.o src/config.o src/utils.o -framework Security 2>&1; then
+    echo "✗ FAIL: Could not compile test helper"
     exit 1
 fi
-
 echo "✓ Test helper compiled"
 echo
 
@@ -53,17 +56,17 @@ echo
 echo "Test 1: Escape double quotes in path"
 INPUT='/tmp/test"path'
 EXPECTED='/tmp/test\"path'
-ACTUAL=$(./test_escape_helper "$INPUT")
+ACTUAL=$("$TEST_DIR/test_escape_helper" "$INPUT")
 
 if [ "$ACTUAL" = "$EXPECTED" ]; then
     echo "  ✓ PASS: Double quote escaped correctly"
-    ((PASS++))
+    inc_pass
 else
     echo "  ✗ FAIL: Double quote not escaped"
     echo "    Input:    $INPUT"
     echo "    Expected: $EXPECTED"
     echo "    Actual:   $ACTUAL"
-    ((FAIL++))
+    inc_fail
 fi
 echo
 
@@ -71,17 +74,17 @@ echo
 echo "Test 2: Escape backslashes in path"
 INPUT='/tmp/test\path'
 EXPECTED='/tmp/test\\path'
-ACTUAL=$(./test_escape_helper "$INPUT")
+ACTUAL=$("$TEST_DIR/test_escape_helper" "$INPUT")
 
 if [ "$ACTUAL" = "$EXPECTED" ]; then
     echo "  ✓ PASS: Backslash escaped correctly"
-    ((PASS++))
+    inc_pass
 else
     echo "  ✗ FAIL: Backslash not escaped"
     echo "    Input:    $INPUT"
     echo "    Expected: $EXPECTED"
     echo "    Actual:   $ACTUAL"
-    ((FAIL++))
+    inc_fail
 fi
 echo
 
@@ -89,17 +92,17 @@ echo
 echo "Test 3: Escape both quotes and backslashes"
 INPUT='/tmp/test\"path'
 EXPECTED='/tmp/test\\\"path'
-ACTUAL=$(./test_escape_helper "$INPUT")
+ACTUAL=$("$TEST_DIR/test_escape_helper" "$INPUT")
 
 if [ "$ACTUAL" = "$EXPECTED" ]; then
     echo "  ✓ PASS: Both characters escaped correctly"
-    ((PASS++))
+    inc_pass
 else
     echo "  ✗ FAIL: Not all characters escaped"
     echo "    Input:    $INPUT"
     echo "    Expected: $EXPECTED"
     echo "    Actual:   $ACTUAL"
-    ((FAIL++))
+    inc_fail
 fi
 echo
 
@@ -107,22 +110,19 @@ echo
 echo "Test 4: Normal path unchanged"
 INPUT='/tmp/normal/path'
 EXPECTED='/tmp/normal/path'
-ACTUAL=$(./test_escape_helper "$INPUT")
+ACTUAL=$("$TEST_DIR/test_escape_helper" "$INPUT")
 
 if [ "$ACTUAL" = "$EXPECTED" ]; then
     echo "  ✓ PASS: Normal path unchanged"
-    ((PASS++))
+    inc_pass
 else
     echo "  ✗ FAIL: Normal path was modified"
     echo "    Input:    $INPUT"
     echo "    Expected: $EXPECTED"
     echo "    Actual:   $ACTUAL"
-    ((FAIL++))
+    inc_fail
 fi
 echo
-
-# Cleanup
-rm -f test_escape_helper test_escape_helper.c
 
 # Summary
 echo "==================================="

@@ -126,6 +126,19 @@ static int handle_add_path(Config* config, const char* path) {
         return 1;
     }
 
+    // Reject symlinked paths
+    char* tilde_expanded = expand_tilde(path);
+    if (tilde_expanded && strcmp(tilde_expanded, expanded) != 0) {
+        fprintf(stderr, "Error: Path contains a symlink: %s\n"
+                        "  Resolves to: %s\n"
+                        "  Use the resolved path to avoid ambiguity.\n",
+                path, expanded);
+        free(tilde_expanded);
+        free(expanded);
+        return 1;
+    }
+    free(tilde_expanded);
+
     // Check if already exists
     if (pathlist_contains(config->local_paths, expanded)) {
         printf("Path already in config: %s\n", expanded);
@@ -155,6 +168,19 @@ static int handle_remove_path(Config* config, const char* path) {
         fprintf(stderr, "Error: Invalid path: %s\n", path);
         return 1;
     }
+
+    // Reject symlinked paths
+    char* tilde_expanded = expand_tilde(path);
+    if (tilde_expanded && strcmp(tilde_expanded, expanded) != 0) {
+        fprintf(stderr, "Error: Path contains a symlink: %s\n"
+                        "  Resolves to: %s\n"
+                        "  Use the resolved path to avoid ambiguity.\n",
+                path, expanded);
+        free(tilde_expanded);
+        free(expanded);
+        return 1;
+    }
+    free(tilde_expanded);
 
     if (!pathlist_remove(config->local_paths, expanded)) {
         fprintf(stderr, "Warning: Path not found in config: %s\n", path);
@@ -329,13 +355,31 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Add CLI paths
+    // Add CLI paths (reject symlinks for same reason as config files)
     for (int i = 0; i < args->allow_write_paths->count; i++) {
-        char* expanded = expand_path(args->allow_write_paths->paths[i]);
-        if (expanded) {
-            pathlist_add(config->cli_paths, expanded);
-            free(expanded);
+        const char* raw = args->allow_write_paths->paths[i];
+        char* expanded = expand_path(raw);
+        if (!expanded) {
+            fprintf(stderr, "Error: Invalid --allow-write path: %s\n", raw);
+            config_free(config);
+            free_arguments(args);
+            return 1;
         }
+        char* tilde_expanded = expand_tilde(raw);
+        if (tilde_expanded && strcmp(tilde_expanded, expanded) != 0) {
+            fprintf(stderr, "Error: --allow-write path contains a symlink: %s\n"
+                            "  Resolves to: %s\n"
+                            "  Use the resolved path to avoid ambiguity.\n",
+                    raw, expanded);
+            free(tilde_expanded);
+            free(expanded);
+            config_free(config);
+            free_arguments(args);
+            return 1;
+        }
+        free(tilde_expanded);
+        pathlist_add(config->cli_paths, expanded);
+        free(expanded);
     }
 
     // Check for invalid combination: config operation + command

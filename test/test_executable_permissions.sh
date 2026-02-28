@@ -10,6 +10,21 @@ echo
 PASS=0
 FAIL=0
 
+inc_pass() { PASS=$((PASS + 1)); }
+inc_fail() { FAIL=$((FAIL + 1)); }
+
+# Use isolated config dir
+setup_config() {
+    TEST_CONFIG=$(mktemp -d)
+    mkdir -p "$TEST_CONFIG/sandbash/projects"
+    export XDG_CONFIG_HOME="$TEST_CONFIG"
+}
+
+teardown_config() {
+    rm -rf "$TEST_CONFIG"
+    unset XDG_CONFIG_HOME
+}
+
 # Setup: Create a test directory with a shim script
 TEST_DIR=$(mktemp -d)
 trap "rm -rf $TEST_DIR" EXIT
@@ -50,52 +65,58 @@ echo "Created symlink: $TEST_DIR/python_symlink -> $PYTHON_PATH"
 echo "Test 1: Execute Python directly (baseline)"
 if python3 -c "print('hello')" >/dev/null 2>&1; then
     echo "  ✓ PASS: Python executes outside sandbox"
-    ((PASS++))
+    inc_pass
 else
     echo "  ✗ FAIL: Python doesn't execute (baseline failed)"
-    ((FAIL++))
+    inc_fail
 fi
 echo
 
 # Test 2: Execute Python through shim script in sandbox
 echo "Test 2: Execute Python through shim script in sandbox"
+setup_config
 OUTPUT=$(./sandbash "$TEST_DIR/python_shim" -c "print('hello')" 2>&1) || true
+teardown_config
 
 if echo "$OUTPUT" | grep -q "hello"; then
     echo "  ✓ PASS: Python executed through shim"
-    ((PASS++))
+    inc_pass
 else
     echo "  ✗ FAIL: Python shim execution failed"
     echo "    Output: $OUTPUT"
-    ((FAIL++))
+    inc_fail
 fi
 echo
 
 # Test 3: Execute Python through symlink in sandbox
 echo "Test 3: Execute Python through symlink in sandbox"
+setup_config
 OUTPUT=$(./sandbash "$TEST_DIR/python_symlink" -c "print('hello')" 2>&1) || true
+teardown_config
 
 if echo "$OUTPUT" | grep -q "hello"; then
     echo "  ✓ PASS: Python executed through symlink"
-    ((PASS++))
+    inc_pass
 else
     echo "  ✗ FAIL: Python symlink execution failed"
     echo "    Output: $OUTPUT"
-    ((FAIL++))
+    inc_fail
 fi
 echo
 
 # Test 4: Check symlink metadata is readable
 echo "Test 4: Check symlink metadata is readable"
+setup_config
 OUTPUT=$(./sandbash readlink "$TEST_DIR/python_symlink" 2>&1) || true
+teardown_config
 
 if echo "$OUTPUT" | grep -q "$PYTHON_PATH"; then
     echo "  ✓ PASS: Symlink metadata readable"
-    ((PASS++))
+    inc_pass
 else
     echo "  ✗ FAIL: Symlink metadata not readable"
     echo "    Output: $OUTPUT"
-    ((FAIL++))
+    inc_fail
 fi
 echo
 

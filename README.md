@@ -64,14 +64,14 @@ sandbash npm install
 sandbash echo "hello world"
 
 # Execute with temporary writable path
-sandbash --allow-write=/tmp touch /tmp/test.txt
+sandbash --allow-write=/private/tmp touch /tmp/test.txt
 
 # Explicitly run a specific shell with arguments
 sandbash bash -c "echo test"
 sandbash zsh -c "echo test"
 
 # Add a writable path for this directory
-sandbash --add-path /tmp
+sandbash --add-path /private/tmp
 
 # List configured paths
 sandbash --list-paths
@@ -90,11 +90,13 @@ Create a global config:
 ```bash
 mkdir -p ~/.config/sandbash
 cat > ~/.config/sandbash/config <<EOF
-# Global writable paths
-/tmp
+# Global writable paths (must use canonical paths, not symlinks)
+/private/tmp
 ~/Downloads
 EOF
 ```
+
+**Note:** Symlinked paths are rejected — use canonical paths instead. For example, `/tmp` is a symlink to `/private/tmp` on macOS, so use `/private/tmp`. sandbash will show the resolved path in the error message if you use a symlink by mistake.
 
 Example config for Claude Code:
 ```

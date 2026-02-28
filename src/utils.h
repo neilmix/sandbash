@@ -6,7 +6,10 @@
 // Check if current directory is under HOME
 bool is_under_home_directory(void);
 
-// Get expanded path (handle ~ and relative paths)
+// Expand tilde in path (~ to home directory), returns malloc'd string
+char* expand_tilde(const char* path);
+
+// Get expanded path (handle ~ and relative paths via realpath)
 char* expand_path(const char* path);
 
 // Compute SHA256 hash of string, return first 16 hex chars

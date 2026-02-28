@@ -27,7 +27,7 @@ bool is_under_home_directory(void) {
            (cwd[home_len] == '/' || cwd[home_len] == '\0');
 }
 
-char* expand_path(const char* path) {
+char* expand_tilde(const char* path) {
     if (!path) {
         return NULL;
     }
@@ -53,8 +53,18 @@ char* expand_path(const char* path) {
         expanded[sizeof(expanded) - 1] = '\0';
     }
 
-    // Resolve to absolute path
+    return strdup(expanded);
+}
+
+char* expand_path(const char* path) {
+    char* expanded = expand_tilde(path);
+    if (!expanded) {
+        return NULL;
+    }
+
+    // Resolve to absolute path (follows symlinks)
     char* absolute = realpath(expanded, NULL);
+    free(expanded);
     return absolute;
 }
 
