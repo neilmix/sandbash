@@ -53,6 +53,13 @@ char* expand_tilde(const char* path) {
         expanded[sizeof(expanded) - 1] = '\0';
     }
 
+    // Strip trailing slashes (but preserve root "/")
+    size_t elen = strlen(expanded);
+    while (elen > 1 && expanded[elen - 1] == '/') {
+        expanded[elen - 1] = '\0';
+        elen--;
+    }
+
     return strdup(expanded);
 }
 

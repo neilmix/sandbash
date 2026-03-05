@@ -131,8 +131,27 @@ fi
 teardown_config
 echo
 
-# Test 7: Symlinked path in global config is rejected
-echo "Test 7: Symlinked path /tmp is rejected (symlink to /private/tmp)"
+# Test 7: Valid path with trailing slash is accepted (not a false symlink)
+echo "Test 7: Valid path with trailing slash is accepted"
+setup_config
+echo "/private/tmp/" > "$TEST_CONFIG/sandbash/config"
+if OUTPUT=$(./sandbash --list-paths 2>&1); then
+    if echo "$OUTPUT" | grep -q "/private/tmp"; then
+        echo "  ✓ PASS: Trailing-slash path loads successfully"
+        inc_pass
+    else
+        echo "  ✗ FAIL: Path not in output: $OUTPUT"
+        inc_fail
+    fi
+else
+    echo "  ✗ FAIL: Should have succeeded (trailing slash caused false symlink rejection): $OUTPUT"
+    inc_fail
+fi
+teardown_config
+echo
+
+# Test 8: Symlinked path in global config is rejected
+echo "Test 8: Symlinked path /tmp is rejected (symlink to /private/tmp)"
 setup_config
 echo "/tmp" > "$TEST_CONFIG/sandbash/config"
 if OUTPUT=$(./sandbash --list-paths 2>&1); then
@@ -150,8 +169,8 @@ fi
 teardown_config
 echo
 
-# Test 8: Symlinked path in local config is rejected
-echo "Test 8: Symlinked path in local (per-directory) config is rejected"
+# Test 9: Symlinked path in local config is rejected
+echo "Test 9: Symlinked path in local (per-directory) config is rejected"
 setup_config
 HASH=$(./sandbash --list-paths 2>/dev/null | grep "Per-directory" | grep -oE '[a-f0-9]{16}')
 echo "/tmp" > "$TEST_CONFIG/sandbash/projects/$HASH"
@@ -170,8 +189,8 @@ fi
 teardown_config
 echo
 
-# Test 9: Custom symlink to a directory is rejected
-echo "Test 9: Custom symlink to directory is rejected"
+# Test 10: Custom symlink to a directory is rejected
+echo "Test 10: Custom symlink to directory is rejected"
 setup_config
 REAL_DIR=$(mktemp -d)
 LINK_DIR=$(mktemp -d)
@@ -195,8 +214,8 @@ rm -rf "$REAL_DIR"
 teardown_config
 echo
 
-# Test 10: Symlinked path via --allow-write is rejected
-echo "Test 10: Symlinked --allow-write path is rejected"
+# Test 11: Symlinked path via --allow-write is rejected
+echo "Test 11: Symlinked --allow-write path is rejected"
 setup_config
 if OUTPUT=$(./sandbash --allow-write=/tmp echo hello 2>&1); then
     echo "  ✗ FAIL: Should have exited with error for symlinked --allow-write path"
