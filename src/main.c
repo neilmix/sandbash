@@ -32,7 +32,6 @@ typedef enum {
 typedef struct {
     OperationMode mode;
     PathList* allow_write_paths;
-    bool allow_signal;
     int bash_argc;
     char** bash_argv;
 } Arguments;
@@ -49,7 +48,6 @@ static void print_usage(const char* program_name) {
     printf("  --list-paths         List all writable paths\n");
     printf("\nOptions:\n");
     printf("  --allow-write=PATH   Add temporary writable path\n");
-    printf("  --allow-signal       Allow sending signals to other processes\n");
     printf("  -h, --help           Show this help message\n");
 }
 
@@ -61,7 +59,6 @@ static Arguments* parse_arguments(int argc, char* argv[]) {
 
     args->mode = MODE_SANDBOX;
     args->allow_write_paths = pathlist_create();
-    args->allow_signal = false;
     args->bash_argc = 0;
     args->bash_argv = NULL;
 
@@ -72,14 +69,13 @@ static Arguments* parse_arguments(int argc, char* argv[]) {
         {"edit", no_argument, 0, 'e'},
         {"list-paths", no_argument, 0, 'l'},
         {"help", no_argument, 0, 'h'},
-        {"allow-signal", no_argument, 0, 's'},
         {0, 0, 0, 0}
     };
 
     int opt;
     int option_index = 0;
 
-    while ((opt = getopt_long(argc, argv, "+w:a:r:elhs",
+    while ((opt = getopt_long(argc, argv, "+w:a:r:elh",
                               long_options, &option_index)) != -1) {
         switch (opt) {
             case 'w':
@@ -98,9 +94,6 @@ static Arguments* parse_arguments(int argc, char* argv[]) {
                 break;
             case 'l':
                 args->mode = MODE_LIST_PATHS;
-                break;
-            case 's':
-                args->allow_signal = true;
                 break;
             case 'h':
                 print_usage(argv[0]);
@@ -419,7 +412,7 @@ int main(int argc, char* argv[]) {
             break;
         case MODE_SANDBOX: {
             // Generate sandbox profile
-            char* profile = sandbox_generate_profile(config, args->allow_signal);
+            char* profile = sandbox_generate_profile(config);
             if (!profile) {
                 fprintf(stderr, "Error: Failed to generate sandbox profile\n");
                 result = 1;

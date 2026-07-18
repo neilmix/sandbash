@@ -144,20 +144,6 @@ fi
 teardown_config
 echo
 
-# Test 12: --allow-signal flag is accepted
-setup_config
-run_test "--allow-signal flag accepted" \
-    "./sandbash --allow-signal echo 'signal test' | grep -q 'signal test'" \
-    "Should accept --allow-signal and execute command"
-teardown_config
-
-# Test 13: --allow-signal combined with --allow-write
-setup_config
-run_test "--allow-signal with --allow-write" \
-    "./sandbash --allow-signal --allow-write=/private/tmp echo 'combo test' | grep -q 'combo test'" \
-    "Should accept --allow-signal combined with --allow-write"
-teardown_config
-
 # Summary
 echo "=== Test Results ==="
 echo "PASS: $PASS"

@@ -45,7 +45,7 @@ char* escape_sandbox_string(const char* str) {
     return escaped;
 }
 
-char* sandbox_generate_profile(Config* config, bool allow_signal) {
+char* sandbox_generate_profile(Config* config) {
     if (!config) {
         return NULL;
     }
@@ -66,10 +66,22 @@ char* sandbox_generate_profile(Config* config, bool allow_signal) {
     size_t offset = 0;
 
     // Profile header
-    const char* signal_rule = allow_signal
-        ? "(allow signal)"
-        : "(allow signal (target self))";
-
+    //
+    // signal is scoped to same-sandbox: processes started inside the sandbox
+    // can signal each other (killing dev servers, test runners), but cannot
+    // reach the user's editor, shell, or other sandbash sessions.
+    //
+    // ipc-sysv-shm and ipc-sysv-sem cover SysV shared memory and semaphores,
+    // both of which Postgres needs. Note that the create path (shmget/semget)
+    // has no MAC hook, so omitting these rules does not deny SysV IPC
+    // outright -- it permits creating objects while denying IPC_RMID, leaking
+    // them. For shm that fills the tiny system-wide table
+    // (kern.sysv.shmmni = 32); for semaphores kern.sysv.semmni is large
+    // enough that leaks accumulate without a hard cliff.
+    //
+    // ipc-sysv-msg (message queues) is deliberately NOT allowed: no known
+    // workload needs it, and unlike semaphores it carries a data payload.
+    // Hence two explicit rules rather than the ipc-sysv* wildcard.
     offset += snprintf(profile + offset, buffer_size - offset,
         "(version 1)\n"
         "(deny default)\n"
@@ -79,14 +91,15 @@ char* sandbox_generate_profile(Config* config, bool allow_signal) {
         "(allow mach-register)\n"
         "(allow iokit-open)\n"
         "(allow ipc-posix-shm)\n"
+        "(allow ipc-sysv-shm)\n"
+        "(allow ipc-sysv-sem)\n"
         "(allow file-ioctl)\n"
-        "%s\n"
+        "(allow signal (target same-sandbox))\n"
         "(allow network*)\n"
         "(allow file-read*)\n"
         "(allow file-read-metadata)\n"
         "(allow file-map-executable)\n"
-        "(deny file-write*)\n",
-        signal_rule);
+        "(deny file-write*)\n");
 
     // Add write permissions for each path
     for (int i = 0; i < all_paths->count; i++) {

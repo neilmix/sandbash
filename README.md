@@ -66,9 +66,6 @@ sandbash echo "hello world"
 # Execute with temporary writable path
 sandbash --allow-write=/private/tmp touch /tmp/test.txt
 
-# Allow sending signals to other processes
-sandbash --allow-signal my-tool
-
 # Explicitly run a specific shell with arguments
 sandbash bash -c "echo test"
 sandbash zsh -c "echo test"
@@ -116,12 +113,18 @@ Example config for Claude Code:
 - Accidental writes to system directories
 - Malicious writes to files outside project scope
 - Config tampering (configs stored outside sandbox)
+- Signal delivery to processes outside the sandbox (your editor, shell, and
+  other sandbash sessions are unreachable)
 
 **Not protected against:**
 - Network-based attacks (network unrestricted)
 - Reading sensitive files (filesystem is readable)
 - Resource exhaustion
-- Signal delivery to other processes (when `--allow-signal` is used)
+- Signal delivery within the sandbox — processes started inside a sandbash
+  session can signal each other, so a command can kill dev servers and test
+  runners it started
+- Interference with SysV shared memory and semaphores owned by the same user
+  (SysV message queues remain denied)
 
 **Known Limitations:**
 - **Setuid/setgid binaries cannot be executed** - The sandbox enforces `forbidden-exec-sugid` to prevent privilege escalation. Common affected tools include:
@@ -138,6 +141,10 @@ Example config for Claude Code:
 ### "must be invoked from within your home directory"
 
 `sandbash` enforces that you can only run it from subdirectories of your home directory. Navigate to your home directory or a project within it.
+
+### "Path contains a symlink on line N: /dev/fd/1"
+
+Appears when redirecting output to a file (`sandbash cmd > out.txt`) if your config lists `/dev/fd/1` or `/dev/fd/2`. With a pipe or terminal those resolve to the tty, but with a file redirect they resolve to a symlink pointing at the target file, which the symlink check rejects. Pipe instead (`sandbash cmd | cat > out.txt`), or drop the `/dev/fd/*` entries from your config.
 
 ## License
 
