@@ -82,10 +82,21 @@ char* sandbox_generate_profile(Config* config) {
     // ipc-sysv-msg (message queues) is deliberately NOT allowed: no known
     // workload needs it, and unlike semaphores it carries a data payload.
     // Hence two explicit rules rather than the ipc-sysv* wildcard.
+    //
+    // process-exec* of a setuid/setgid binary is denied to sandboxed
+    // processes by macOS unless the rule carries (with no-sandbox), which
+    // runs the child UNCONFINED. /bin/ps is setuid-root and this is the only
+    // way to exec it. The exception is deliberately scoped to the exact
+    // literal path: /bin/ps is read-only and spawns nothing, so an
+    // unconfined ps cannot write files or leak confinement to descendants.
+    // Do NOT broaden this to a subpath, a name, or other setuid tools
+    // (top, sudo, crontab, ...) -- that would turn write-confinement into a
+    // general sandbox-escape primitive.
     offset += snprintf(profile + offset, buffer_size - offset,
         "(version 1)\n"
         "(deny default)\n"
         "(allow process*)\n"
+        "(allow process-exec* (with no-sandbox) (literal \"/bin/ps\"))\n"
         "(allow sysctl*)\n"
         "(allow mach-lookup)\n"
         "(allow mach-register)\n"

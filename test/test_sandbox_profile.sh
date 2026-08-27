@@ -204,6 +204,35 @@ fi
 teardown_config
 echo
 
+# Test 9: setuid /bin/ps is exec'able via the scoped no-sandbox exception.
+# Third-party scripts rely on ps; it is setuid-root, so the profile grants a
+# (with no-sandbox) exception scoped to the literal /bin/ps path.
+echo "Test 9: /bin/ps runs under the sandbox"
+setup_config
+if ./sandbash /bin/ps -o pid= -p $$ 2>/dev/null | grep -qE '[0-9]'; then
+    echo "  ✓ PASS: /bin/ps executes"
+    inc_pass
+else
+    echo "  ✗ FAIL: /bin/ps should execute"
+    inc_fail
+fi
+teardown_config
+echo
+
+# Test 10: the ps exception must NOT generalize to other setuid binaries.
+# /usr/bin/top is setuid-root and carries no exception, so exec must be denied.
+echo "Test 10: other setuid binaries (top) remain denied"
+setup_config
+if ./sandbash /usr/bin/top -l 1 -n 0 >/dev/null 2>&1; then
+    echo "  ✗ FAIL: /usr/bin/top should remain denied (only /bin/ps is excepted)"
+    inc_fail
+else
+    echo "  ✓ PASS: /usr/bin/top denied"
+    inc_pass
+fi
+teardown_config
+echo
+
 # Summary
 echo "=== Test Results ==="
 echo "PASS: $PASS"

@@ -37,6 +37,7 @@ Sandbox-dependent tests (most of `test_argument_parsing.sh` and all of `test_san
 - `expand_tilde()` does `~` expansion only; `expand_path()` does `~` expansion + `realpath()`
 - Config load failures in `main.c` must be checked and cause exit(1)
 - The sandbox profile is fixed — there are no flags that loosen it. `--allow-write`/`--add-path` only add writable paths. Signals are scoped to `(target same-sandbox)`; SysV shm and semaphores are always allowed, message queues are not.
+- Setuid/setgid exec is denied to sandboxed processes by macOS unless the rule carries `(with no-sandbox)`, which runs the child unconfined. The profile grants exactly one such exception, scoped to the literal `/bin/ps` (read-only, spawns nothing). Do NOT broaden it to a subpath/name or other setuid tools — that turns write-confinement into a general escape primitive.
 
 ## Test conventions
 

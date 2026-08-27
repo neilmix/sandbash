@@ -127,14 +127,20 @@ Example config for Claude Code:
   (SysV message queues remain denied)
 
 **Known Limitations:**
-- **Setuid/setgid binaries cannot be executed** - The sandbox enforces `forbidden-exec-sugid` to prevent privilege escalation. Common affected tools include:
-  - `/bin/ps` - Process monitoring
+- **Most setuid/setgid binaries cannot be executed** - macOS denies a
+  sandboxed process from exec'ing a setuid/setgid binary unless the profile
+  grants a `(with no-sandbox)` exception, which runs that child *unconfined*.
+  The profile grants exactly one such exception, scoped to the literal path
+  `/bin/ps`, because third-party scripts commonly depend on it and `ps` is
+  read-only and spawns nothing (so an unconfined `ps` cannot write files or
+  leak confinement to descendants). Other setuid tools remain unrunnable:
   - `/usr/bin/top` - Real-time process viewer
   - `/usr/bin/sudo`, `/usr/bin/su` - Privilege escalation
   - `/usr/bin/crontab` - Job scheduling
   - `/usr/sbin/traceroute` - Network diagnostics
 
-  This is a fundamental macOS security feature. Non-setuid alternatives (like `ls`, `grep`, `whoami`, `uname`, etc.) work normally.
+  Non-setuid alternatives (like `ls`, `grep`, `whoami`, `uname`, `pgrep`,
+  etc.) work normally.
 
 ## Troubleshooting
 
