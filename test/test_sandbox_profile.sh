@@ -233,6 +233,102 @@ fi
 teardown_config
 echo
 
+# Tests 11-14: "- " config lines deny reads and writes. The fixture lives
+# under the (always writable) current directory, so the deny must override
+# the broader write allowance.
+DENY_ROOT="$(pwd -P)/tmp/deny_test_$$"
+setup_deny() {
+    setup_config
+    rm -rf "$DENY_ROOT"
+    mkdir -p "$DENY_ROOT/parent/secret" "$DENY_ROOT/files"
+    echo SECRET > "$DENY_ROOT/parent/secret/s.txt"
+    echo FILESECRET > "$DENY_ROOT/files/f.txt"
+    echo PUBLIC > "$DENY_ROOT/files/public.txt"
+    printf -- '- %s\n- %s\n' "$DENY_ROOT/parent/secret" "$DENY_ROOT/files/f.txt" \
+        > "$TEST_CONFIG/sandbash/config"
+}
+# Fails the current test if sandbash cannot start with the deny config, so
+# the "access was blocked" assertions below cannot pass vacuously.
+deny_preflight() {
+    if ./sandbash true 2>/dev/null; then
+        return 0
+    fi
+    echo "  ✗ FAIL: sandbash failed to start with deny config"
+    inc_fail
+    return 1
+}
+teardown_deny() {
+    rm -rf "$DENY_ROOT" "$DENY_ROOT.moved"
+    teardown_config
+}
+
+echo "Test 11: Denied directory and file cannot be read"
+setup_deny
+if ./sandbash cat "$DENY_ROOT/parent/secret/s.txt" 2>/dev/null | grep -q SECRET; then
+    echo "  ✗ FAIL: Read of denied directory content should fail"
+    inc_fail
+elif ./sandbash cat "$DENY_ROOT/files/f.txt" 2>/dev/null | grep -q FILESECRET; then
+    echo "  ✗ FAIL: Read of denied file should fail"
+    inc_fail
+elif ./sandbash ls "$DENY_ROOT/parent/secret" >/dev/null 2>&1; then
+    echo "  ✗ FAIL: Listing denied directory should fail"
+    inc_fail
+elif ! ./sandbash cat "$DENY_ROOT/files/public.txt" 2>/dev/null | grep -q PUBLIC; then
+    echo "  ✗ FAIL: Sibling of denied file should remain readable"
+    inc_fail
+else
+    echo "  ✓ PASS: Denied paths unreadable, siblings readable"
+    inc_pass
+fi
+teardown_deny
+echo
+
+echo "Test 12: Denied paths cannot be written, even inside a writable path"
+setup_deny
+if deny_preflight; then
+    ./sandbash bash -c "echo x > '$DENY_ROOT/parent/secret/new'; echo x >> '$DENY_ROOT/files/f.txt'; rm -f '$DENY_ROOT/files/f.txt'" 2>/dev/null || true
+    if [ -e "$DENY_ROOT/parent/secret/new" ] || [ "$(cat "$DENY_ROOT/files/f.txt" 2>/dev/null)" != FILESECRET ]; then
+        echo "  ✗ FAIL: Denied paths were modified"
+        inc_fail
+    else
+        echo "  ✓ PASS: Denied paths unmodified"
+        inc_pass
+    fi
+fi
+teardown_deny
+echo
+
+# Renaming an ancestor of a denied path moves it to a new, unmatched path.
+# Ancestors must not be renameable or the deny is trivially bypassed.
+echo "Test 13: Ancestors of denied paths cannot be renamed"
+setup_deny
+if ! deny_preflight; then :
+elif ! deny_preflight; then :
+elif ./sandbash bash -c "mv '$DENY_ROOT/parent' '$DENY_ROOT/moved' && cat '$DENY_ROOT/moved/secret/s.txt'" 2>/dev/null | grep -q SECRET \
+    || ./sandbash bash -c "mv '$DENY_ROOT' '$DENY_ROOT.moved' && cat '$DENY_ROOT.moved/parent/secret/s.txt'" 2>/dev/null | grep -q SECRET \
+    || ./sandbash bash -c "mv '$DENY_ROOT/files' '$DENY_ROOT/f2' && cat '$DENY_ROOT/f2/f.txt'" 2>/dev/null | grep -q FILESECRET; then
+    echo "  ✗ FAIL: Renaming an ancestor exposed denied content"
+    inc_fail
+else
+    echo "  ✓ PASS: Ancestor rename blocked"
+    inc_pass
+fi
+teardown_deny
+echo
+
+echo "Test 14: Denied file cannot be hard-linked to a readable path"
+setup_deny
+if ! deny_preflight; then :
+elif ./sandbash bash -c "ln '$DENY_ROOT/files/f.txt' '$DENY_ROOT/hl' && cat '$DENY_ROOT/hl'" 2>/dev/null | grep -q FILESECRET; then
+    echo "  ✗ FAIL: Hard link exposed denied file"
+    inc_fail
+else
+    echo "  ✓ PASS: Hard link blocked"
+    inc_pass
+fi
+teardown_deny
+echo
+
 # Summary
 echo "=== Test Results ==="
 echo "PASS: $PASS"

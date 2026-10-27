@@ -4,11 +4,11 @@ A command sandboxing tool for macOS that restricts filesystem write access to de
 
 ## Purpose
 
-`sandbash` enables safe AI-assisted development by executing commands in a sandboxed environment where only specific directories or files are writable. All other filesystem locations remain readable but protected from modification.
+`sandbash` enables safe AI-assisted development by executing commands in a sandboxed environment where only specific directories or files are writable. All other filesystem locations remain readable but protected from modification, except paths explicitly denied in config, which are neither readable nor writable.
 
 ## Features
 
-- **Filesystem sandboxing**: Current directory is writable, everything else is read-only by default
+- **Filesystem sandboxing**: Current directory is writable, everything else is read-only by default, and denied paths are unreadable
 - **Direct command execution**: Run any command in a sandbox, not just bash
 - **Three-tier configuration**: Global config, per-directory config, and command-line flags
 - **Easy config management**: Built-in commands to add, remove, and edit writable paths for the local directory
@@ -84,25 +84,29 @@ Configuration files are stored in `~/.config/sandbash/` following the XDG Base D
 - Global config: `~/.config/sandbash/config`
 - Per-directory configs: `~/.config/sandbash/projects/<hash>`
 
-Config format is a list of writable files and directories, one per line. Comment lines begin with `#`.
+Each non-blank line begins with `+ ` or `- ` followed by a file or directory path:
+
+- `+ PATH` makes the path writable.
+- `- PATH` denies the path: it can be neither read nor written, even inside a writable path such as the current directory. Its ancestor directories cannot be renamed or removed, since that would move the denied content to an unprotected path.
+
+Any other line, including comments, is a hard error. Wildcards are not supported.
 
 Create a global config:
 ```bash
 mkdir -p ~/.config/sandbash
 cat > ~/.config/sandbash/config <<EOF
-# Global writable paths (must use canonical paths, not symlinks)
-/private/tmp
-~/Downloads
++ /private/tmp
++ ~/Downloads
+- ~/.ssh
 EOF
 ```
 
 **Note:** Symlinked paths are rejected — use canonical paths instead. For example, `/tmp` is a symlink to `/private/tmp` on macOS, so use `/private/tmp`. sandbash will show the resolved path in the error message if you use a symlink by mistake.
 
-Example config for Claude Code:
+Example config for Claude Code (enables `--dangerously-skip-permissions`):
 ```
-# Enable Claude Code for --dangerously-skip-permissions
-~/.claude
-~/.claude.json
++ ~/.claude
++ ~/.claude.json
 ```
 
 **Shell Selection:** When launched without arguments, sandbash automatically uses your preferred shell from the `$SHELL` environment variable. If `$SHELL` isn't set or points to a non-existent shell, it falls back to `/bin/bash`.
@@ -118,7 +122,11 @@ Example config for Claude Code:
 
 **Not protected against:**
 - Network-based attacks (network unrestricted)
-- Reading sensitive files (filesystem is readable)
+- Reading sensitive files not listed as `- ` denied paths (filesystem is
+  readable by default)
+- Denied content leaking through processes outside the sandbox (e.g.
+  Spotlight via `mdfind`/`mdls`, `osascript` driving Terminal) or through
+  pre-existing hard links located outside the denied path
 - Resource exhaustion
 - Signal delivery within the sandbox — processes started inside a sandbash
   session can signal each other, so a command can kill dev servers and test

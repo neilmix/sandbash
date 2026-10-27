@@ -59,14 +59,14 @@ Create a global config:
 ```bash
 mkdir -p ~/.config/sandbash
 cat > ~/.config/sandbash/config <<EOF
-# Global writable paths
-/tmp
-~/Downloads
++ /private/tmp
++ ~/Downloads
+- ~/.ssh
 EOF
 ```
 
-Config format is a list of writeable files and directories one per line.
-Comment lines begin with #
+Each non-blank line is `+ PATH` (writable) or `- PATH` (neither readable nor
+writable). Any other line, including comments, is an error.
 
 ## Code Signing (Optional)
 

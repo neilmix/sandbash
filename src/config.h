@@ -16,6 +16,8 @@ typedef struct {
     PathList* global_paths;
     PathList* local_paths;
     PathList* cli_paths;
+    PathList* global_deny_paths;
+    PathList* local_deny_paths;
     char* current_dir;
 } Config;
 
@@ -48,6 +50,9 @@ bool config_load_local(Config* config);
 
 // Get merged list of all writable paths
 PathList* config_get_all_paths(Config* config);
+
+// Get merged list of all denied (unreadable and unwritable) paths
+PathList* config_get_deny_paths(Config* config);
 
 // Save per-directory config
 bool config_save_local(Config* config);

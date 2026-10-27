@@ -252,32 +252,33 @@ static int handle_edit(Config* config) {
     return 1;
 }
 
+static void print_path_lists(PathList* allow, PathList* deny) {
+    if (allow->count == 0 && deny->count == 0) {
+        printf("  (none)\n");
+        return;
+    }
+    for (int i = 0; i < allow->count; i++) {
+        printf("  + %s\n", allow->paths[i]);
+    }
+    for (int i = 0; i < deny->count; i++) {
+        printf("  - %s\n", deny->paths[i]);
+    }
+}
+
 static int handle_list_paths(Config* config) {
     printf("Current directory: %s (always writable)\n\n", config->current_dir);
 
     char* xdg_config = get_xdg_config_dir();
 
     printf("Global paths (from %s/sandbash/config):\n", xdg_config);
-    if (config->global_paths->count == 0) {
-        printf("  (none)\n");
-    } else {
-        for (int i = 0; i < config->global_paths->count; i++) {
-            printf("  %s\n", config->global_paths->paths[i]);
-        }
-    }
+    print_path_lists(config->global_paths, config->global_deny_paths);
     printf("\n");
 
     char* local_config_path = config_get_local_path(config);
     printf("Per-directory paths (from %s):\n", local_config_path);
     free(local_config_path);
 
-    if (config->local_paths->count == 0) {
-        printf("  (none)\n");
-    } else {
-        for (int i = 0; i < config->local_paths->count; i++) {
-            printf("  %s\n", config->local_paths->paths[i]);
-        }
-    }
+    print_path_lists(config->local_paths, config->local_deny_paths);
     printf("\n");
 
     printf("Command-line paths:\n");
@@ -285,7 +286,7 @@ static int handle_list_paths(Config* config) {
         printf("  (none)\n");
     } else {
         for (int i = 0; i < config->cli_paths->count; i++) {
-            printf("  %s\n", config->cli_paths->paths[i]);
+            printf("  + %s\n", config->cli_paths->paths[i]);
         }
     }
 

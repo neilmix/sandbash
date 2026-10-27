@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <sandbox.h>
 
 char* escape_sandbox_string(const char* str) {
@@ -43,6 +44,43 @@ char* escape_sandbox_string(const char* str) {
     *out = '\0';
 
     return escaped;
+}
+
+// Append a rule whose single %s is filled with the escaped path, growing the
+// buffer as needed. On failure the buffer is freed and false is returned.
+static bool append_path_rule(char** profile, size_t* buffer_size,
+                             size_t* offset, const char* format,
+                             const char* path) {
+    char* escaped = escape_sandbox_string(path);
+    if (!escaped) {
+        free(*profile);
+        return false;
+    }
+
+    for (;;) {
+        int n = snprintf(*profile + *offset, *buffer_size - *offset,
+                         format, escaped);
+        if (n < 0) {
+            free(escaped);
+            free(*profile);
+            return false;
+        }
+        if ((size_t)n < *buffer_size - *offset) {
+            *offset += n;
+            free(escaped);
+            return true;
+        }
+
+        size_t new_size = *buffer_size * 2;
+        char* new_profile = realloc(*profile, new_size);
+        if (!new_profile) {
+            free(escaped);
+            free(*profile);
+            return false;
+        }
+        *profile = new_profile;
+        *buffer_size = new_size;
+    }
 }
 
 char* sandbox_generate_profile(Config* config) {
@@ -114,32 +152,65 @@ char* sandbox_generate_profile(Config* config) {
 
     // Add write permissions for each path
     for (int i = 0; i < all_paths->count; i++) {
-        char* escaped = escape_sandbox_string(all_paths->paths[i]);
-        if (!escaped) {
-            free(profile);
+        if (!append_path_rule(&profile, &buffer_size, &offset,
+                              "(allow file-write* (subpath \"%s\"))\n",
+                              all_paths->paths[i])) {
             pathlist_free(all_paths);
             return NULL;
-        }
-
-        offset += snprintf(profile + offset, buffer_size - offset,
-            "(allow file-write* (subpath \"%s\"))\n",
-            escaped);
-        free(escaped);
-
-        if (offset >= buffer_size - 512) {
-            // Need more space
-            buffer_size *= 2;
-            char* new_profile = realloc(profile, buffer_size);
-            if (!new_profile) {
-                free(profile);
-                pathlist_free(all_paths);
-                return NULL;
-            }
-            profile = new_profile;
         }
     }
 
     pathlist_free(all_paths);
+
+    // Denied paths come after the write allowances: when rules conflict the
+    // last match wins, so a deny overrides a broader writable ancestor
+    // (e.g. a denied directory inside the always-writable current dir).
+    //
+    // A path-based deny is bypassed by renaming any ancestor -- after
+    // `mv parent other`, the content lives at a path no rule matches. So
+    // every ancestor of a denied path also gets file-write-unlink denied as
+    // a literal: the ancestor itself cannot be renamed or removed, while
+    // everything else inside it stays writable.
+    PathList* deny_paths = config_get_deny_paths(config);
+    PathList* ancestors = pathlist_create();
+    if (!deny_paths || !ancestors) {
+        pathlist_free(deny_paths);
+        pathlist_free(ancestors);
+        free(profile);
+        return NULL;
+    }
+
+    for (int i = 0; i < deny_paths->count; i++) {
+        const char* path = deny_paths->paths[i];
+        if (!append_path_rule(&profile, &buffer_size, &offset,
+                              "(deny file-read* file-write* (subpath \"%s\"))\n",
+                              path)) {
+            pathlist_free(deny_paths);
+            pathlist_free(ancestors);
+            return NULL;
+        }
+
+        char ancestor[PATH_MAX];
+        snprintf(ancestor, sizeof(ancestor), "%s", path);
+        char* slash;
+        while ((slash = strrchr(ancestor, '/')) && slash != ancestor) {
+            *slash = '\0';
+            pathlist_add(ancestors, ancestor);
+        }
+    }
+
+    for (int i = 0; i < ancestors->count; i++) {
+        if (!append_path_rule(&profile, &buffer_size, &offset,
+                              "(deny file-write-unlink (literal \"%s\"))\n",
+                              ancestors->paths[i])) {
+            pathlist_free(deny_paths);
+            pathlist_free(ancestors);
+            return NULL;
+        }
+    }
+
+    pathlist_free(deny_paths);
+    pathlist_free(ancestors);
     return profile;
 }
 

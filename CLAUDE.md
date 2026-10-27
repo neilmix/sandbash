@@ -33,6 +33,8 @@ Sandbox-dependent tests (most of `test_argument_parsing.sh` and all of `test_san
 ## Key conventions
 
 - Config parsing is strict: missing directories and invalid paths are hard errors (not warnings)
+- Config lines are `+ PATH` (writable) or `- PATH` (denied read+write). Any other non-blank line, including `#` comments, is a hard error. No wildcards.
+- Deny rules are emitted after write allowances (last match wins). Every ancestor of a denied path gets `(deny file-write-unlink (literal ...))` so it cannot be renamed to move the denied content out from under the path-based rule.
 - Symlinked paths are rejected everywhere (config files, `--allow-write`, `--add-path`) — user must specify canonical paths. Uses `expand_tilde()` vs `expand_path()` comparison to detect symlinks.
 - `expand_tilde()` does `~` expansion only; `expand_path()` does `~` expansion + `realpath()`
 - Config load failures in `main.c` must be checked and cause exit(1)

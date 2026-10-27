@@ -27,8 +27,11 @@ static bool is_valid_config_path(const char* path) {
     return true;
 }
 
-static bool parse_config_file(const char* filepath, PathList* list) {
-    if (!filepath || !list) {
+// Each non-blank line is "+ PATH" (writable) or "- PATH" (denied: neither
+// readable nor writable). Anything else, including comments, is an error.
+static bool parse_config_file(const char* filepath, PathList* allow_list,
+                              PathList* deny_list) {
+    if (!filepath || !allow_list || !deny_list) {
         return false;
     }
 
@@ -45,7 +48,7 @@ static bool parse_config_file(const char* filepath, PathList* list) {
         line_num++;
 
         // Check for maximum paths limit
-        if (list->count >= MAX_CONFIG_PATHS) {
+        if (allow_list->count + deny_list->count >= MAX_CONFIG_PATHS) {
             fprintf(stderr, "Warning: Maximum paths (%d) exceeded, ignoring remaining lines\n",
                     MAX_CONFIG_PATHS);
             break;
@@ -60,7 +63,7 @@ static bool parse_config_file(const char* filepath, PathList* list) {
             fprintf(stderr, "Warning: Line %d too long, truncated\n", line_num);
         }
 
-        // Skip empty lines and comments
+        // Skip blank lines
         char* trimmed = line;
         while (*trimmed == ' ' || *trimmed == '\t') {
             trimmed++;
@@ -73,8 +76,20 @@ static bool parse_config_file(const char* filepath, PathList* list) {
             trim_len--;
         }
 
-        if (trimmed[0] == '\0' || trimmed[0] == '#') {
+        if (trimmed[0] == '\0') {
             continue;
+        }
+
+        if ((trimmed[0] != '+' && trimmed[0] != '-') || trimmed[1] != ' ') {
+            fprintf(stderr, "Error: Invalid config line %d: must begin with \"+ \" or \"- \": %s\n",
+                    line_num, trimmed);
+            fclose(f);
+            return false;
+        }
+        PathList* list = trimmed[0] == '+' ? allow_list : deny_list;
+        trimmed += 2;
+        while (*trimmed == ' ' || *trimmed == '\t') {
+            trimmed++;
         }
 
         // Expand and add path
@@ -220,8 +235,11 @@ Config* config_create(void) {
     config->global_paths = pathlist_create();
     config->local_paths = pathlist_create();
     config->cli_paths = pathlist_create();
+    config->global_deny_paths = pathlist_create();
+    config->local_deny_paths = pathlist_create();
 
-    if (!config->global_paths || !config->local_paths || !config->cli_paths) {
+    if (!config->global_paths || !config->local_paths || !config->cli_paths
+        || !config->global_deny_paths || !config->local_deny_paths) {
         config_free(config);
         return NULL;
     }
@@ -249,6 +267,8 @@ void config_free(Config* config) {
     pathlist_free(config->global_paths);
     pathlist_free(config->local_paths);
     pathlist_free(config->cli_paths);
+    pathlist_free(config->global_deny_paths);
+    pathlist_free(config->local_deny_paths);
     free(config->current_dir);
     free(config);
 }
@@ -284,6 +304,27 @@ PathList* config_get_all_paths(Config* config) {
     return all;
 }
 
+PathList* config_get_deny_paths(Config* config) {
+    if (!config) {
+        return NULL;
+    }
+
+    PathList* all = pathlist_create();
+    if (!all) {
+        return NULL;
+    }
+
+    for (int i = 0; i < config->global_deny_paths->count; i++) {
+        pathlist_add(all, config->global_deny_paths->paths[i]);
+    }
+
+    for (int i = 0; i < config->local_deny_paths->count; i++) {
+        pathlist_add(all, config->local_deny_paths->paths[i]);
+    }
+
+    return all;
+}
+
 bool config_load_global(Config* config) {
     if (!config) {
         return false;
@@ -298,7 +339,8 @@ bool config_load_global(Config* config) {
     snprintf(filepath, sizeof(filepath), "%s/sandbash/config", xdg_config);
     free(xdg_config);
 
-    return parse_config_file(filepath, config->global_paths);
+    return parse_config_file(filepath, config->global_paths,
+                             config->global_deny_paths);
 }
 
 bool config_load_local(Config* config) {
@@ -325,7 +367,8 @@ bool config_load_local(Config* config) {
     free(xdg_config);
     free(hash);
 
-    return parse_config_file(filepath, config->local_paths);
+    return parse_config_file(filepath, config->local_paths,
+                             config->local_deny_paths);
 }
 
 char* config_get_local_path(Config* config) {
@@ -391,11 +434,12 @@ bool config_save_local(Config* config) {
         return false;
     }
 
-    fprintf(f, "# Per-directory config for: %s\n", config->current_dir);
-    fprintf(f, "# One path per line\n\n");
-
     for (int i = 0; i < config->local_paths->count; i++) {
-        fprintf(f, "%s\n", config->local_paths->paths[i]);
+        fprintf(f, "+ %s\n", config->local_paths->paths[i]);
+    }
+
+    for (int i = 0; i < config->local_deny_paths->count; i++) {
+        fprintf(f, "- %s\n", config->local_deny_paths->paths[i]);
     }
 
     fclose(f);
